@@ -19,24 +19,32 @@ def file_upload():
 
   im_bytes = im_file.read()
   im = Image.open(io.BytesIO(im_bytes))
-  print(f"image recieved! size: {im.size}")
+  print(f"image recieved! size: {im.size}, image conversion time: {time.time() - tick}")
 
   model_tick = time.time()
   results = model(im, size=640)
-  print(f"model runtime: {time.time() - model_tick}")
+  model_runtime = time.time() - model_tick
+  print(f"model runtime: {model_runtime}")
   
   result_dict = results.pandas().xyxy[0].to_dict(orient="records")
   print(f"object detected: {[ result['name'] for result in result_dict ]}")
 
   stateMachine.newFrame(result_dict)
 
-  return_json = json.dumps(stateMachine.guides)
+  return_dict = {
+    "yolo": result_dict,
+    "yolo_runtime": model_runtime, 
+    "guide": stateMachine.guides,
+    "state_machine": ""
+  }
+
+  return_json = json.dumps(return_dict)
 
   print(f"total runtime: {time.time() - tick}", flush=True)
   return return_json
 
 
-@app.route('/start', methods=['PUT'])
+@app.route('/start', methods=['GET'])
 def start():
   print("--------restarting state machine----------")
   global stateMachine
