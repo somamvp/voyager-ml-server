@@ -13,7 +13,7 @@ git clone --recurse-submodules https://github.com/somamvp/voyager-ml-server.git
 cd voyager-ml-server
 
 # import conda env: 'server-gpu-env'
-conda env create -f conda_environment.yaml
+conda env create -f conda_environments.yaml
 conda activate server-gpu-env
 
 # run server script
