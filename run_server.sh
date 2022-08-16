@@ -7,10 +7,9 @@ BASEDIR=$(dirname "$0")
 cd $BASEDIR
 
 conda activate server-gpu-env
-
-conda info
+conda info | grep "active environment"
 
 [ ! -d "runs" ] && mkdir runs
 python server.py 1 > runs/run.log 2>&1
 
-echo "Done!"
+echo "server terminated!"

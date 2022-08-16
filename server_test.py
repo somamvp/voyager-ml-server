@@ -32,9 +32,31 @@ def file_upload():
   # stateMachine.newFrame(result_dict)
 
   return_dict = {
-    "yolo": "test",
-    "yolo_runtime": "test", 
-    "guide": "1234",
+    "yolo": [
+        {
+            "xmin": 665.7411499023438,
+            "ymin": 604.4212646484375,
+            "xmax": 1724.0,
+            "ymax": 967.1834106445312,
+            "confidence": 0.9451523423194885,
+            "class": 0,
+            "name": "Zebra_Cross"
+        },
+        {
+            "xmin": 1038.79052734375,
+            "ymin": 420.12811279296875,
+            "xmax": 1059.23779296875,
+            "ymax": 472.7822570800781,
+            "confidence": 0.841476321220398,
+            "class": 1,
+            "name": "R_Signal"
+        }
+    ],
+    "yolo_runtime": 1.0199544429779053, 
+    "guide": [
+        "traffic light & crossroad detected! start guiding",
+        "traffic light Red! stay."
+    ],
     "state_machine": "1234"
   }
 
