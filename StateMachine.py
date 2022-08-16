@@ -62,19 +62,19 @@ class StateMachine:
   def startGuidingCrossroad(self):
     self.isGuidingCrossroad = True
     self.lastTrafficLight = self.currentTrafficLight
-    self.guide("traffic light & crossroad detected! start guiding")
+    self.guide("횡단보도 안내를 시작합니다.")
     
     if self.currentTrafficLight == TrafficLight.Red:
-      self.guide("traffic light Red! stay.")
+      self.guide("빨간불입니다. 정지하세요.")
     elif self.currentTrafficLight == TrafficLight.Green:
-      self.guide("traffic light Green! but, stay.")
+      self.guide("초록불입니다. 다음 신호를 기다리세요.")
 
 
   def onTrafficLightChanged(self):
     if self.currentTrafficLight == TrafficLight.Red:
-      self.guide("changed to Red!")
+      self.guide("신호가 빨간불로 바뀌었습니다.")
     elif self.currentTrafficLight == TrafficLight.Green:
-      self.guide("changed to Green!")
+      self.guide("신호가 초록불로 바뀌었습니다.")
 
   def guide(self, message: str):
     print(message)
