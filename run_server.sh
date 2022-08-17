@@ -1,12 +1,11 @@
 #!/bin/bash
 
-# export PATH="${PATH}:/home/ubuntu/miniconda3/bin:/home/ubuntu/miniconda3/condabin:"
-source ~/miniconda3/etc/profile.d/conda.sh
+source ~/.bashrc
 
 BASEDIR=$(dirname "$0")
 cd $BASEDIR
 
-conda activate server-gpu-env
+source activate server-gpu-env
 conda info | grep "active environment"
 
 if [ -z $1 ]; then 
