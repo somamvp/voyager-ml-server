@@ -15,7 +15,11 @@ else
 fi
 
 [ ! -d "runs" ] && mkdir runs
+LOG_FILE=runs/$(date +%y-%d-%m_%T).log
+
 echo "running script ${SERVER_SCRIPT}"
-python $SERVER_SCRIPT 1 > runs/$(date +%y-%d-%m_%T).log 2>&1
+python $SERVER_SCRIPT 1 > $LOG_FILE 2>&1 &
+
+tail -F $LOG_FILE
 
 echo "server terminated!"
