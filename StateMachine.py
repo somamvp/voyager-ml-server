@@ -77,5 +77,5 @@ class StateMachine:
       self.guide("신호가 초록불로 바뀌었습니다.")
 
   def guide(self, message: str):
-    print(message)
+    # print(message)
     self.guides.append(message)
