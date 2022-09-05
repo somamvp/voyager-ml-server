@@ -1,4 +1,5 @@
 #!/bin/bash
+date="$(date '+%y%m%d_%H:%M')"
 
 source ~/.bashrc
 
@@ -15,7 +16,7 @@ else
 fi
 
 [ ! -d "runs" ] && mkdir runs
-LOG_FILE=runs/$(date +%y-%d-%m_%T).log
+LOG_FILE=runs/fast_${date}.log
 
 echo "running script ${SERVER_SCRIPT}"
 python $SERVER_SCRIPT 1 > $LOG_FILE 2>&1 &

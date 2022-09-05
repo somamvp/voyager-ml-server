@@ -21,10 +21,9 @@ async def test():
 async def file_upload(img: bytes = File(...), sequenceNo: int = 1):
   tick = time.time()
 
-  im_file = img    # request: multipart form data -> extract image data
+  im_file = img    
   im_id = sequenceNo
 
-  #im_bytes = im_file.read()
   im = Image.open(io.BytesIO(im_file))
   # print(f"image recieved! size: {im.size}, image conversion time: {time.time() - tick}")
 
