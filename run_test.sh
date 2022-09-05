@@ -9,7 +9,7 @@ source activate server-gpu-env
 conda info | grep "active environment"
 
 if [ -z $1 ]; then 
-    SERVER_SCRIPT='server_guide_only.py'
+    SERVER_SCRIPT='server_test.py'
 else 
     SERVER_SCRIPT=$1
 fi

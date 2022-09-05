@@ -1,24 +1,31 @@
-from flask import Flask, url_for, redirect, render_template, request
+from fastapi import FastAPI, Form, File, UploadFile
 from PIL import Image
-from model import get_model
 from StateMachine import StateMachine
+from model import get_model
 import os, io, time, json
+
+app = FastAPI()
+stateMachine = StateMachine()
 
 model = get_model("weseel_AL3.pt")
 
-app = Flask(__name__)
+@app.get("//")
+async def root():
+    return {"message": "Hello World"}
 
-stateMachine = StateMachine()
+@app.get("//test")
+async def test():
+    return {"message": "test"}
 
-@app.route('/upload', methods=['POST'])
-def file_upload():
+@app.post("//upload")
+async def file_upload(img: bytes = File(...), sequenceNo: int = 1):
   tick = time.time()
 
-  im_file = request.files['img']    # request: multipart form data -> extract image data
-  im_id = request.form['sequenceNo']
+  im_file = img    # request: multipart form data -> extract image data
+  im_id = sequenceNo
 
-  im_bytes = im_file.read()
-  im = Image.open(io.BytesIO(im_bytes))
+  #im_bytes = im_file.read()
+  im = Image.open(io.BytesIO(im_file))
   # print(f"image recieved! size: {im.size}, image conversion time: {time.time() - tick}")
 
   model_tick = time.time()
@@ -47,16 +54,9 @@ def file_upload():
   return return_json
 
 
-@app.route('/start', methods=['GET'])
-def start():
-  print("--------restarting state machine----------")
-  global stateMachine
-  stateMachine = StateMachine()
-  return ""
-
-@app.route('/test', methods=['GET'])
-def test():
-  return "test"
-
-if __name__ == '__main__':
-  app.run('0.0.0.0')
+@app.get("//start")
+async def start():
+    print("--------restarting state machine----------")
+    global stateMachine
+    stateMachine = StateMachine()
+    return ""
