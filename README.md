@@ -12,9 +12,9 @@
 git clone --recurse-submodules https://github.com/somamvp/voyager-ml-server.git
 cd voyager-ml-server
 
-# import conda env: 'server-gpu-env'
-conda env create -f conda_environments.yaml
-conda activate server-gpu-env
+# import conda env: 'yolov7-env'
+conda env create -f conda_environments_yolov7.yaml
+conda activate yolov7-env
 
 # run server script
-python server.py
+run_fastapi.sh
