@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/bin/zsh
 
 CURRENT_PID=$(pgrep -f server_fast)
 date="$(date '+%y%m%d_%H:%M')"
 LOG_DIR=runs
 echo process info: ${CURRENT_PID}
 
-source ~/.bashrc
+source ~/.zshrc
 
 BASEDIR=$(dirname "$0")
 cd $BASEDIR
@@ -29,10 +29,10 @@ fi
 
 [ ! -d "runs" ] && mkdir runs
 
-
+pypath=/home/soma2/anaconda3/envs/yolov7-env/bin/python
 echo "running script ${SERVER_SCRIPT}"
 
-uvicorn $SERVER_SCRIPT:app --reload --host 0.0.0.0 > ${LOG_DIR}/fast_$date.log 2>&1 &
+${pypath} -m uvicorn ${SERVER_SCRIPT}:app --reload --host 0.0.0.0 > ${LOG_DIR}/fast_$date.log 2>&1 &
 
 # python $SERVER_SCRIPT 1 > $LOG_FILE 2>&1 &
 
