@@ -10,7 +10,7 @@ source ~/.zshrc
 BASEDIR=$(dirname "$0")
 cd $BASEDIR
 
-source activate server-gpu-env
+source activate yolov7-env
 conda info | grep "active environment"
 
 if [ -z $1 ]; then 

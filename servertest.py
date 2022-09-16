@@ -76,17 +76,19 @@ async def test():
     return {"message": "test"}
 
 @app.post("/upload")
-async def file_upload(source: bytes = File(...), sequenceNo: int = 1):
+def file_upload(source: bytes = File(...), sequenceNo: int = 1):
     tick = time.time()
 
     im_file = source    
     im_id = sequenceNo
 
     # im = Image.open(io.BytesIO(im_file))
+    print(type(bytearray(source)))
     encoded_img = np.fromstring(im_file, dtype = np.uint8)  # type : nparray
     img_cv = cv2.imdecode(encoded_img, cv2.IMREAD_COLOR)  
     
-    logger.info(f"image recieved! size: {img_cv.size}, image conversion time: {time.time() - tick}")
+    # logger.info(f"image recieved! size: {img_cv.size}, image conversion time: {time.time() - tick}")
+    print(f"image recieved size : {img_cv.shape}")
 
     # model_tick = time.time()
     # results = model(im, size=640)
@@ -94,8 +96,8 @@ async def file_upload(source: bytes = File(...), sequenceNo: int = 1):
     # results.save(save_dir=f"run_imgs/{im_id}")
     # im.save(f"run_imgs/{im_id}/input.png", "PNG")
     # logger.info("model runtime: {}", model_runtime)
-
-    dataset = LoadSingleImage(img_cv, img_size=imgsz, stride=stride)  # 이부분 좀더 만져야됨
+    print(imgsz)
+    dataset = LoadSingleImage(encoded_img, img_size=imgsz, stride=stride)  # 이부분 좀더 만져야됨
     # dataset = LoadImages('image_sample/MP_KSC_007490.jpg', img_size=imgsz, stride=stride)
     result_dict={}  # sequenceNO : detection result
 
@@ -196,3 +198,9 @@ async def start():
     global stateMachine
     stateMachine = StateMachine()
     return ""
+
+
+if __name__ == "__main__":
+    im = cv2.imread('/home/soma2/MVP/voyager-ml-server/image_sample/MP_KSC_007490.jpg')
+    image_bytes = cv2.imencode('.jpg', im)[1].tobytes()
+    print(file_upload(image_bytes))
