@@ -5,3 +5,6 @@
 	path = yolov7
 	url = https://github.com/WongKinYiu/yolov7.git
 	branch = main
+[submodule "security"]
+	path = security
+	url = https://github.com/somamvp/security.git
