@@ -1,0 +1,47 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build: fastapi",
+            "command": "./run_fastapi.sh",
+            "problemMatcher": []
+        },
+        {
+            "label": "PortForward: ssh",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "-i",
+                "somaMVP.pem",
+                "-R",
+                "8000:127.0.0.1:5001",
+                "ubuntu@43.200.90.162"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "PortForward: fastapi",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "-i",
+                "somaMVP.pem",
+                "-R",
+                "5001:127.0.0.1:8000",
+                "ubuntu@43.200.90.162"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "PortForward: flask",
+            "command": "ssh",
+            "args": [
+                "-i",
+                "somaMVP.pem",
+                "-R",
+                "5000:127.0.0.1:5000",
+                "ubuntu@43.200.90.162"
+            ]
+        }
+    ]
+}
