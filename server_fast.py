@@ -40,7 +40,7 @@ async def file_upload(source: bytes = File(...), sequenceNo: int = 1):
     # YOLO 추론
     result_dict[im_id] = detector.inference(img_cv, im_id)
     # result_dict[im_id] = detector.inference('image_sample/MP_KSC_007490.jpg')
-    print(f'Inference Done. ({time.time()- tick:.3f}s)')
+    logger.info(f'Inference Done. ({time.time()- tick:.3f}s)')
     
 
 
