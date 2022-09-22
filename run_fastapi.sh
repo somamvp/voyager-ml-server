@@ -29,7 +29,7 @@ fi
 
 [ ! -d "runs" ] && mkdir runs
 
-pypath=/home/soma2/anaconda3/envs/yolov7-env/bin/python
+pypath=/home/$USER/anaconda3/envs/yolov7-env/bin/python
 echo "running script ${SERVER_SCRIPT}"
 
 ${pypath} -m uvicorn ${SERVER_SCRIPT}:app --reload --host 0.0.0.0 > ${LOG_DIR}/fast_$date.log 2>&1 &
