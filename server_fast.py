@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Form, File, UploadFile
 from PIL import Image
 from StateMachine import StateMachine
-import os, io, time, json, easydict
+import os, io, time, json, easydict, cv2
+import numpy as np
 from loguru import logger
 from yolov7_wrapper import Detector
 
@@ -37,7 +38,7 @@ async def file_upload(source: bytes = File(...), sequenceNo: int = 1):
     logger.info(f"image recieved! size: {img_cv.size}, image conversion time: {time.time() - tick}")
 
     # YOLO 추론
-    result_dict[im_id] = detector.inference(img_cv)
+    result_dict[im_id] = detector.inference(img_cv, im_id)
     # result_dict[im_id] = detector.inference('image_sample/MP_KSC_007490.jpg')
     print(f'Inference Done. ({time.time()- tick:.3f}s)')
     

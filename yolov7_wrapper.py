@@ -3,7 +3,7 @@ sys.path.append('./yolov7/')
 import numpy as np
 import time, json, easydict, torch
 from pathlib import Path
-from random import random
+import random
 
 from models.experimental import attempt_load
 from utils.datasets import LoadStreams, LoadImages, letterbox
@@ -52,9 +52,10 @@ class Detector:
         if self.device.type != 'cpu':
             self.model(torch.zeros(1, 3, self.imgsz, self.imgsz).to(self.device).type_as(next(self.model.parameters())))  # run once
        
+    def getSaveDir(self):
         return self.save_dir
     
-    def inference(self, source):
+    def inference(self, source, im_id):
         # tick = time.time()
         if type(source) is not str:
             dataset = LoadSingleImage(source, img_size=self.imgsz, stride=self.stride)
