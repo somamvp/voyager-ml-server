@@ -3,6 +3,7 @@ sys.path.append('./yolov7/')
 import numpy as np
 import time, json, easydict, torch
 from pathlib import Path
+from datetime import datetime
 import random
 
 from models.experimental import attempt_load
@@ -52,11 +53,10 @@ class Detector:
         if self.device.type != 'cpu':
             self.model(torch.zeros(1, 3, self.imgsz, self.imgsz).to(self.device).type_as(next(self.model.parameters())))  # run once
        
-    def getSaveDir(self):
-        return self.save_dir
-    
-    def inference(self, source, im_id):
+
+    def inference(self, source, im_id, depth=None):
         # tick = time.time()
+        save_name = str(datetime.now().strftime('%y%m%d_%H%M%S.%f'[:-2]))+f'-{im_id}'
         if type(source) is not str:
             dataset = LoadSingleImage(source, img_size=self.imgsz, stride=self.stride)
         else:
@@ -87,9 +87,8 @@ class Detector:
                 # save_path = str(save_dir / p.name)  # img.jpg
                 # txt_path = str(save_dir / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
 
-                img_name = str(time.strftime('%y%m%d_%H%M%S', time.localtime(time.time())))+'-'+str(im_id)
-                save_path = str(self.save_dir / img_name)+'.jpg'
-                txt_path = str(self.save_dir / img_name)
+                save_path = str(self.save_dir / save_name)+'.jpg'
+                txt_path = str(self.save_dir / save_name)+'.txt'
 
                 s += '%gx%g ' % img.shape[2:]  # print string
                 gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
@@ -114,12 +113,18 @@ class Detector:
                         box["confidence"]= round(float(conf),4)
                         box["class"]= int(cls)
                         box["name"]= self.names[int(cls)]
+                        if depth != None:
+                            scale = 3   # 클수록 협범위
+                            box_w = coor[2]-coor[0]
+                            box_h = coor[3]-coor[1]
+                            hitbox = depth[coor[0]+int(box_w/scale):coor[2]-int(box_w/scale), coor[1]+int(box_h/scale):coor[3]-int(box_h/scale)]
+                            box['depth']= numpy.mean(hitbox)
 
                         boxes.append(box)
 
                         if self.save_txt:  # Write to file
                             # xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                            with open(txt_path + '.txt', 'a') as f:
+                            with open(txt_path, 'a') as f:
                                 f.write(f'{int(cls)} {self.names[int(cls)]} {coor} {round(float(conf),5)}\n') if \
                                     self.opt.save_conf else f.write(f'{int(cls)} {self.names[int(cls)]} {coor}\n')  # label format
 
@@ -134,9 +139,11 @@ class Detector:
                 # Save results (image with detections)
                 if self.save_img:
                     cv2.imwrite(save_path, im0)
-                    print(f" The image with the result is saved in: {save_path}")
+                    if depth ! =None:
+                        Image.fromarray(depth_cv).save(f'{save_dir}/{save_name}_depth.jpg')
+                    # print(f" The image with the result is saved in: {save_path}")
                 
-                return results
+                return results, self.save_dir, save_name
 
 
 class LoadSingleImage:
