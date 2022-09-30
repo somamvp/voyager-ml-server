@@ -33,14 +33,14 @@ async def file_upload(source: bytes = File(...), sequenceNo: int = 1):
 
     # 이미지 로딩
     encoded_img = np.fromstring(source, dtype = np.uint8)  # type : nparray
-    channel = encoded_img.shape[2]
-    if channel == 3: # Only RGB input
-        img_cv = cv2.imdecode(encoded_img, cv2.IMREAD_COLOR)  
-    elif channel == 4:  # With depth value
+    RGBD = cv2.imdecode(encoded_img, cv2.IMREAD_UNCHANGED)
+    channel = RGBD.shape[2]
+    if channel == 4:
         is_depth_mode = True
-        RGBD = cv2.imdecode(encoded_img, cv2.IMREAD_UNCHANGED)
-        depth_cv = RGBD[:,:,0]
-        img_cv = RGBD[:,:,1:4]
+        depth_cv = RGBD[:,:,3]
+        img_cv = RGBD[:,:,0:3]
+    elif channel == 3:
+        img_cv = RGBD
     else:
         print(f"Image Channel ERROR seqNO : {sequenceNo}")
     
