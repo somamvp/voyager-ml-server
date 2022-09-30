@@ -6,7 +6,7 @@ import numpy as np
 from loguru import logger
 from yolov7_wrapper import Detector
 
-model_name = 'wesee7_fin.pt'
+model_name = 'basic7_ind2.pt'
 opt = easydict.EasyDict({'agnostic_nms':False, 'augment':True, 'classes':None, 'conf_thres':0.25, 'device':'cpu', 
                             'exist_ok':False, 'img_size':640, 'iou_thres':0.45, 'name':'exp', 'view_img':False,
                             'no_trace':False, 'nosave':False, 'project':'runs/detect', 'save_conf':True, 'save_txt':True,
