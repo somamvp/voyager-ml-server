@@ -5,6 +5,7 @@ import time, json, easydict, torch
 from pathlib import Path
 from datetime import datetime
 import random
+from PIL import Image
 
 from models.experimental import attempt_load
 from utils.datasets import LoadStreams, LoadImages, letterbox
@@ -54,7 +55,7 @@ class Detector:
             self.model(torch.zeros(1, 3, self.imgsz, self.imgsz).to(self.device).type_as(next(self.model.parameters())))  # run once
        
 
-    def inference(self, source, im_id, depth=None):
+    def inference(self, source, im_id, depth_cv=None):
         # tick = time.time()
         save_name = str(datetime.now().strftime('%y%m%d_%H%M%S.%f'[:-2]))+f'-{im_id}'
         if type(source) is not str:
@@ -113,37 +114,38 @@ class Detector:
                         box["confidence"]= round(float(conf),4)
                         box["class"]= int(cls)
                         box["name"]= self.names[int(cls)]
-                        if depth != None:
+                        if depth_cv is not None:
                             scale = 3   # 클수록 협범위
                             box_w = coor[2]-coor[0]
                             box_h = coor[3]-coor[1]
-                            hitbox = depth[coor[0]+int(box_w/scale):coor[2]-int(box_w/scale), coor[1]+int(box_h/scale):coor[3]-int(box_h/scale)]
-                            box['depth']= numpy.mean(hitbox)
+                            hitbox = depth_cv[int(coor[0]+box_w/scale):int(coor[2]-box_w/scale), int(coor[1]+box_h/scale):int(coor[3]-box_h/scale)]
+                            depth = np.mean(hitbox)
+                            box['depth']= depth
+                        else:
+                            depth = 'NA'
 
                         boxes.append(box)
 
-                        if self.save_txt:  # Write to file
-                            # xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                            with open(txt_path, 'a') as f:
-                                f.write(f'{int(cls)} {self.names[int(cls)]} {coor} {round(float(conf),5)}\n') if \
-                                    self.opt.save_conf else f.write(f'{int(cls)} {self.names[int(cls)]} {coor}\n')  # label format
+                        # Save text
+                        with open(txt_path, 'a') as f:
+                            f.write(f'{int(cls)}\t %-18s %-30s\t %.05f\t {depth}\n'%(self.names[int(cls)], coor, round(float(conf),5)))
 
-                        if self.save_img:  # Add bbox to image
-                            label = f'{self.names[int(cls)]} {conf:.2f}'
-                            plot_one_box(xyxy, im0, label=label, color=self.colors[int(cls)], line_thickness=3)
+                        # Save image
+                        label = f'{self.names[int(cls)]} {conf:.2f}'
+                        plot_one_box(xyxy, im0, label=label, color=self.colors[int(cls)], line_thickness=3)
                 
                 print(f'Inference Done. ({t2 - t1:.3f}s)')
 
                 results={}
                 results["yolo"]=boxes
+
                 # Save results (image with detections)
-                if self.save_img:
-                    cv2.imwrite(save_path, im0)
-                    if depth ! =None:
-                        Image.fromarray(depth_cv).save(f'{save_dir}/{save_name}_depth.jpg')
-                    # print(f" The image with the result is saved in: {save_path}")
+                cv2.imwrite(save_path, im0)
+                if depth_cv is not None:
+                    Image.fromarray(depth_cv).save(f'{save_path}_depth.jpg')
+                # print(f" The image with the result is saved in: {save_path}")
                 
-                return results, self.save_dir, save_name
+                return results
 
 
 class LoadSingleImage:
