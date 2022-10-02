@@ -122,7 +122,7 @@ class Detector:
                             depth = np.mean(hitbox)
                             box['depth']= depth
                         else:
-                            depth = 'NA'
+                            depth = 'NA' 
 
                         boxes.append(box)
 
