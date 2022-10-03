@@ -9,3 +9,6 @@
 	path = security
 	url = https://github.com/somamvp/security.git
 	branch = main
+[submodule "norfair"]
+	path = norfair
+	url = https://github.com/tryolabs/norfair.git
