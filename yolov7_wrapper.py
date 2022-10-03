@@ -57,7 +57,7 @@ class Detector:
 
     def inference(self, source, im_id, depth_cv=None):
         # tick = time.time()
-        save_name = str(datetime.now().strftime('%y%m%d_%H%M%S.%f'[:-2]))+f'-{im_id}'
+        save_name = str(datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4])+f'_Session{im_id}'
         if type(source) is not str:
             dataset = LoadSingleImage(source, img_size=self.imgsz, stride=self.stride)
         else:
