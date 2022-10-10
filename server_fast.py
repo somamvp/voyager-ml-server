@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Form, File, UploadFile
 from PIL import Image
 from StateMachine import StateMachine
-import os, io, time, json, easydict, cv2
+import os, io, time, json, easydict, cv2, description
 import numpy as np
 from loguru import logger
 from yolov7_wrapper import Detector
@@ -76,6 +76,7 @@ async def file_upload(source: bytes = File(...), SESSION_NO: int = 1):
     logger.info("사용자 안내: {}", stateMachine.guides)
 
     guide_enum = stateMachine.guides
+    guide_obj = description.inform(data = result_dict[SESSION_NO]['yolo'], mode = description.ReadMode.LEFT_TO_RIGHT)
 
 
     logger.info("/upload total runtime: {}", (time.time() - tick))
