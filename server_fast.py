@@ -75,11 +75,12 @@ async def file_upload(source: bytes = File(...), SESSION_NO: int = 1):
     stateMachine.newFrame(result_dict[SESSION_NO]['yolo'])
     logger.info("사용자 안내: {}", stateMachine.guides)
 
-    guide_enum = json.dumps(stateMachine.guides)
+    guide_enum = stateMachine.guides
 
 
     logger.info("/upload total runtime: {}", (time.time() - tick))
-    return high_freq, result_dict[SESSION_NO], guide_enum
+    # return high_freq, result_dict[SESSION_NO], guide_enum
+    return guide_enum
 
 @app.post("/update")
 async def file_update(source: bytes = File(...), SESSION_NO: int = 1):

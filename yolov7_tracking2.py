@@ -1,4 +1,5 @@
-import os
+import os, natsort, sys
+sys.path.append('./norfair/')
 from typing import List, Optional, Union
 from easydict import EasyDict
 import cv2
@@ -9,11 +10,24 @@ import torchvision.ops.boxes as bops
 
 import norfair
 from norfair import Detection, Paths, Tracker, Video
-from norfair.distances import frobenius, iou
+from norfair.distances import frobenius, iou, mean_euclidean
 
-DISTANCE_THRESHOLD_BBOX: float = 0.7
-DISTANCE_THRESHOLD_CENTROID: int = 30
-MAX_DISTANCE: int = 10000
+TRACK_METHOD_PRESETS = {
+    "bbox": EasyDict({
+        "distance_function": iou,
+        "distance_threshold": 0.8,
+    }),
+
+    "centroid": EasyDict({
+        "distance_function": frobenius,
+        "distance_threshold": 100,
+    }),
+
+    "bbox_distance": EasyDict({
+        "distance_function": mean_euclidean,
+        "distance_threshold": 200,
+    }),
+}
 
 
 class YOLO:
@@ -44,7 +58,7 @@ class YOLO:
         img: Union[str, np.ndarray],
         conf_threshold: float = 0.25,
         iou_threshold: float = 0.45,
-        image_size: int = 720,
+        image_size: int = 640,
         classes: Optional[List[int]] = None,
     ) -> torch.tensor:
 
@@ -79,7 +93,7 @@ def detector_detections_to_norfair_detections(
                     label=box["class"],
                 )
             )
-    elif track_points == "bbox":
+    elif track_points in ["bbox", "bbox_distance"]:
         for box in detections:
             xmin, ymin, xmax, ymax = box["xmin"], box["ymin"], box["xmax"], box["ymax"]
             bbox = np.array(
@@ -120,7 +134,7 @@ def yolo_detections_to_norfair_detections(
                     label=int(detection_as_xywh[-1].item()),
                 )
             )
-    elif track_points == "bbox":
+    elif track_points in ["bbox", "bbox_distance"]:
         detections_as_xyxy = yolo_detections.xyxy[0]
         for detection_as_xyxy in detections_as_xyxy:
             bbox = np.array(
@@ -142,12 +156,13 @@ def yolo_detections_to_norfair_detections(
 
 
 args = EasyDict({
-    "detector_path": "voyagerExtending.pt",
-    "track_points": "centroid",
+    "detector_path": "extended_1.pt",
+    "track_points": "bbox_distance",
     "img_size": 640,
     "conf_threshold": 0.25,
     "iou_threshold": 0.45,
     "classes": None,
+    # ['Zebra_Cross', 'R_Signal', 'G_Signal', 'Braille_Block', 'person', 'dog', 'tree', 'car', 'bus', 'truck', 'motorcycle', 'bicycle', 'none', 'wheelchair', 'stroller', 'kickboard', 'bollard', 'manhole', 'labacon', 'bench', 'barricade', 'pot', 'table', 'chair', 'fire_hydrant', 'movable_signage', 'bus_stop'],
     "device": "cpu",
 })
 
@@ -165,18 +180,18 @@ def track(frame: Union[str, np.ndarray], img_count: int):
     detections = yolo_detections_to_norfair_detections(
         yolo_detections, track_points=args.track_points
     )
-    # print(detections)
+
     tracked_objects = tracker.update(detections=detections)
     print(tracked_objects)
 
     if args.track_points == "centroid":
         norfair.draw_points(frame, detections)
         norfair.draw_tracked_objects(frame, tracked_objects)
-    elif args.track_points == "bbox":
+    elif args.track_points in ["bbox", "bbox_distance"]:
         norfair.draw_boxes(frame, detections)
-        norfair.draw_tracked_boxes(frame, tracked_objects)
+        norfair.draw_tracked_boxes(frame, tracked_objects, draw_labels=True, label_size=0.5)
     
-    cv2.imwrite(f"tracked_{img_count}.jpg", frame)
+    cv2.imwrite(f"./tracked/tracked_{img_count}.jpg", frame)
     return yolo_detections, detections, tracked_objects
 
 if __name__ == "__main__":
@@ -184,22 +199,19 @@ if __name__ == "__main__":
     model = YOLO(args.detector_path, device=args.device)
     model.model.to(args.device)
 
-    distance_function = iou if args.track_points == "bbox" else frobenius
-
-    distance_threshold = (
-        DISTANCE_THRESHOLD_BBOX
-        if args.track_points == "bbox"
-        else DISTANCE_THRESHOLD_CENTROID
-    )
+    track_presets = TRACK_METHOD_PRESETS[args.track_points]
 
     tracker = Tracker(
-        distance_function=distance_function,
-        distance_threshold=distance_threshold,
-        hit_counter_max = 5,
-        initialization_delay = 3
+        distance_function=track_presets.distance_function,
+        distance_threshold=track_presets.distance_threshold,
+        hit_counter_max = 2,
+        initialization_delay = 1,
+        filter_factory=norfair.filter.FilterPyKalmanFilterFactory(R=0.001, Q=0.001, P=0.5)
     )
 
-    img_name = "/home/soma1/MVP/dataset/Wesee_sample_parsed/val/images/MP_SEL_038189.jpg"
-    for i in range(10):
-        _ = track(img_name, i)
+    img_list = natsort.natsorted(os.listdir("../Material3"))
+    cnt=0
+    for img in img_list:
+        _ = track("../Material3/"+img, cnt)
+        cnt+=1
 
