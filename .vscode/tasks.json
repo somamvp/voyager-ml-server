@@ -1,7 +1,6 @@
 {
     "version": "2.0.0",
     "tasks": [
-
         {
             "label": "Build: fastapi",
             "command": "./run_fastapi.sh",
@@ -39,6 +38,32 @@
                 "somaMVP.pem",
                 "-R",
                 "5001:127.0.0.1:8000",
+                "ubuntu@43.200.90.162"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "PortForward: spring",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "-i",
+                "somaMVP.pem",
+                "-R",
+                "8888:127.0.0.1:8000",
+                "ubuntu@43.200.90.162"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "PortForward: ELK",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "-i",
+                "somaMVP.pem",
+                "-R",
+                "5601:127.0.0.1:5601",
                 "ubuntu@43.200.90.162"
             ],
             "problemMatcher": []
