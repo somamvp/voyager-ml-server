@@ -1,4 +1,4 @@
-import sys, cv2
+import sys, cv2, os, shutil
 sys.path.append('./yolov7/')
 import numpy as np
 import time, json, easydict, torch
@@ -32,6 +32,11 @@ class Detector:
         self.model = attempt_load(self.weights, map_location=self.device)  # load FP32 model
 
         # Directories
+        dirs = os.listdir(Path(opt.project))
+        # print(dirs)
+        for dir in dirs:
+            if len(os.listdir(f"{Path(opt.project)}/{dir}"))==0:
+                shutil.rmtree(f"{Path(opt.project)}/{dir}")
         self.save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
         (self.save_dir).mkdir(parents=True, exist_ok=True)  # make dir
         
@@ -54,10 +59,12 @@ class Detector:
         if self.device.type != 'cpu':
             self.model(torch.zeros(1, 3, self.imgsz, self.imgsz).to(self.device).type_as(next(self.model.parameters())))  # run once
        
+    def getSavedir(self):
+        return self.save_dir
 
-    def inference(self, source, im_id, depth_cv=None):
+    def inference(self, source, im_id, save_name:str, depth_cv=None):
         # tick = time.time()
-        save_name = str(datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4])+f'_Session{im_id}'
+        # save_name = str(datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4])+f'_Session{im_id}'
         if type(source) is not str:
             dataset = LoadSingleImage(source, img_size=self.imgsz, stride=self.stride)
         else:

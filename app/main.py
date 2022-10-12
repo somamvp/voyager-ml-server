@@ -1,16 +1,17 @@
 from fastapi import FastAPI, Form, File, UploadFile
 from PIL import Image
-from StateMachine import StateMachine
 import os, io, time, json, easydict, cv2
 import numpy as np
 from loguru import logger
-from yolov7_wrapper import Detector
+
+from .state_machine import StateMachine
+from .yolov7_wrapper import Detector
 
 # 이미지 회전 여부
 is_Rot = True
 
 model_name = 'basic7_fin.pt' 
-opt = easydict.EasyDict({'agnostic_nms':False, 'augment':True, 'classes':None, 'conf_thres':0.25, 'device':'cpu', 
+opt = easydict.EasyDict({'agnostic_nms':False, 'augment':True, 'classes':None, 'conf_thres':0.25, 'device':'gpu', 
                             'exist_ok':False, 'img_size':640, 'iou_thres':0.45, 'name':'exp', 'view_img':False,
                             'no_trace':False, 'nosave':False, 'project':'runs/detect', 'save_conf':True, 'save_txt':True,
                             'update':False, 'weights':[model_name]})

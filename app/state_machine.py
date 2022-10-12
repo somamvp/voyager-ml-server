@@ -1,8 +1,12 @@
 from enum import Enum, auto
 from typing import List, Dict, Union
-from norfair.tracker import TrackedObject
-from yolov7_tracking import *
-from voyagerExtended import YOLO_IDX_TO_NAME
+from easydict import EasyDict
+
+import norfair
+from norfair.tracker import Tracker, TrackedObject
+
+from .tracking import TRACK_METHOD_PRESETS, detector_detections_to_norfair_detections
+from .voyager_metadata import YOLO_IDX_TO_NAME
 
 YOLO_CLASS_NAMES = {
     "R_Signal": "Red", 
@@ -37,6 +41,9 @@ class StateMachine:
     self.use_tracking = use_tracking
     if use_tracking:
       self.configure_tracking()
+
+  def serialize(self) -> str:
+    return ""
 
 
   def configure_tracking(self):

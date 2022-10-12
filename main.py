@@ -2,6 +2,8 @@ from fastapi import FastAPI, Form, File, UploadFile
 from PIL import Image
 from StateMachine import StateMachine
 import os, io, time, json, easydict, cv2
+from datetime import datetime
+import description
 import numpy as np
 from loguru import logger
 from yolov7_wrapper import Detector
@@ -59,11 +61,13 @@ async def file_upload(source: bytes = File(...), SESSION_NO: int = 1):
 
     # 이미지 로딩
     rgb, depth_cv = bytes2cv(source)
-    logger.info(f"image recieved! size: {rgb.size}, image conversion time: {time.time() - tick}")
-    print(rgb.shape)
+    logger.info(f"image recieved! size: {rgb.shape}, image conversion time: {time.time() - tick}")
+    img_size=[rgb.shape[0], rgb.shape[1]]
+    # print(rgb.shape)
 
     # YOLO 추론
-    result_dict[SESSION_NO] = detector.inference(rgb, SESSION_NO, depth_cv)  # 리턴타입은 {'yolo':list of bbox}, 바운딩박스 자료형은 딕셔너리   
+    save_name = str(datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4])+f'_Session{SESSION_NO}'
+    result_dict[SESSION_NO] = detector.inference(rgb, SESSION_NO, save_name, depth_cv)  # 리턴타입은 {'yolo':list of bbox}, 바운딩박스 자료형은 딕셔너리   
 
 
     logger.info(f'Inference Done. ({time.time()- tick:.3f}s)')
@@ -76,11 +80,14 @@ async def file_upload(source: bytes = File(...), SESSION_NO: int = 1):
     logger.info("사용자 안내: {}", stateMachine.guides)
 
     guide_enum = stateMachine.guides
+    guide_obj = description.inform(result_dict[SESSION_NO]['yolo'], img_size= img_size)
 
 
     logger.info("/upload total runtime: {}", (time.time() - tick))
     # return high_freq, result_dict[SESSION_NO], guide_enum
-    return guide_enum
+    return {'guide':guide_enum, 'yolo':guide_obj}   # 정렬/솎아진 상태의 디텍션 정보
+
+
 
 @app.post("/update")
 async def file_update(source: bytes = File(...), SESSION_NO: int = 1):
@@ -93,7 +100,8 @@ async def file_update(source: bytes = File(...), SESSION_NO: int = 1):
     logger.info(f"image recieved! size: {rgb.size}, image conversion time: {time.time() - tick}")
 
     # YOLO 추론
-    result_dict[SESSION_NO] = detector.inference(rgb, SESSION_NO, depth_cv)  # 리턴타입은 {'yolo':list of bbox}, 바운딩박스 자료형은 딕셔너리   
+    save_name = str(datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4])+f'_Session{SESSION_NO}'
+    result_dict[SESSION_NO] = detector.inference(rgb, SESSION_NO, save_name, depth_cv)  # 리턴타입은 {'yolo':list of bbox}, 바운딩박스 자료형은 딕셔너리   
 
 
     logger.info(f'Inference Done. ({time.time()- tick:.3f}s)')
@@ -101,7 +109,7 @@ async def file_update(source: bytes = File(...), SESSION_NO: int = 1):
     logger.info("발견된 물체: {}", [ result['name'] for result in result_dict[SESSION_NO]['yolo'] ])
 
     logger.info("/update total runtime: {}", (time.time() - tick))
-    return high_freq, result_dict[SESSION_NO]
+    return {'high_freq':high_freq, 'yolo':result_dict[SESSION_NO]['yolo']}  # 정렬/솎아진 상태의 디텍션 정보
 
 
 @app.get("/start")

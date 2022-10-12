@@ -1,5 +1,4 @@
 import os, natsort, sys
-sys.path.append('./norfair/')
 from typing import List, Optional, Union
 from easydict import EasyDict
 import cv2

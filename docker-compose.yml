@@ -1,0 +1,27 @@
+version: '3.3'
+services:
+  fastapi:
+    build: .
+    # image: fastapi
+    command: uvicorn app.main:app --host 0.0.0.0 --port 9898 --reload
+    ports:
+      - 9898:9898
+    # volumes:
+    #   - ./app:/code/app
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [ gpu ]
+  # # cuda:
+  #   image: nvidia/cuda:11.7.0-base-ubuntu20.04
+  #   command: nvidia-smi
+  #   runtime: nvidia
+
+# networks:
+#   default:
+#     driver: bridge
+#     driver_opts:
+#       com.docker.network.driver.mtu: 1442

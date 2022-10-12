@@ -1,0 +1,4 @@
+**/__pycache__
+**/runs/
+**/traced_model.pt
+Dockerfile

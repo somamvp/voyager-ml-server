@@ -14,7 +14,7 @@ source activate yolov7-env
 conda info | grep "active environment"
 
 if [ -z $1 ]; then 
-    SERVER_SCRIPT='server_fast'
+    SERVER_SCRIPT='main'
 else 
     SERVER_SCRIPT=$1
 fi

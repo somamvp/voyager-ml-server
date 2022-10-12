@@ -1,3 +1,11 @@
+# Data files
+*.mp4
+*.MOV
+*.jpg
+*.gif
+*.png
+
+
 # YOLO files
 runs/
 *.pt

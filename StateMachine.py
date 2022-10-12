@@ -1,7 +1,7 @@
 from enum import Enum, auto
 from typing import List, Dict, Union
 from norfair.tracker import TrackedObject
-from yolov7_tracking2 import *
+from yolov7_tracking import *
 from voyagerExtended import YOLO_IDX_TO_NAME
 
 YOLO_CLASS_NAMES = {
@@ -59,12 +59,12 @@ class StateMachine:
       )
       tracked_objects = self.tracker.update(detections=detections)
 
-      detections_with_name_only = [ {"name": YOLO_IDX_TO_NAME[obj.last_detection.label]} for obj in frame_data ]
+      detections_with_name_only = [ {"name": YOLO_IDX_TO_NAME[obj.last_detection.label]} for obj in tracked_objects ]
       frame_data = detections_with_name_only
 
     self.guides = []
 
-    if self.detect_cross_signal(frame_data)
+    if self.detect_cross_signal(frame_data):
 
       if not self.is_guiding_crossroad:
         self.start_guiding_crossroad()
@@ -74,7 +74,7 @@ class StateMachine:
       
       self.last_trafficlight = self.current_trafficlight
 
-    elif not detect_classes(frame_data, ["Zebra_Cross"]):    # 횡단보도 하나도 없을 때
+    elif not self.detect_classes(frame_data, ["Zebra_Cross"]):    # 횡단보도 하나도 없을 때
 
       if self.is_guiding_crossroad:
         self.on_end_crossroad()
