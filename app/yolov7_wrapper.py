@@ -13,6 +13,41 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
+ALPHA_TO_RANGE = 20.0 / 255.0
+
+
+@dataclass
+class DetectorObject:
+    xmin: float
+    ymin: float
+    xmax: float
+    ymax: float
+
+    confidence: float
+    cls: int
+    name: str
+
+    depth: float
+
+    def __getitem__(self, item):
+        return getattr(self, item, None)
+
+    def __setitem__(self, item, value):
+        setattr(self, item, value)
+
+    def bbox_coordinate_diagonal(self) -> List[float]:
+        return [self.xmin, self.ymin, self.xmax, self.ymax]
+
+
+@dataclass
+class DetectorInference:
+    yolo: List[DetectorObject]
+
+    def __getitem__(self, item):
+        return getattr(self, item, None)
+
+    def __setitem__(self, item, value):
+        setattr(self, item, value)
 
 
 class Detector:
@@ -53,6 +88,11 @@ class Detector:
         if self.device.type != 'cpu':
             self.model(torch.zeros(1, 3, self.imgsz, self.imgsz).to(self.device).type_as(next(self.model.parameters())))  # run once
        
+    def inference(
+        self, source, im_id, save_name: str, depth_cv=None
+    ) -> DetectorInference:
+        if not save_name:
+            save_name = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{im_id}"
 
     def inference(self, source, im_id, depth_cv=None):
         # tick = time.time()
@@ -114,15 +154,34 @@ class Detector:
                         box["class"]= int(cls)
                         box["name"]= self.names[int(cls)]
                         if depth_cv is not None:
-                            scale = 3   # 클수록 협범위
-                            box_w = coor[2]-coor[0]
-                            box_h = coor[3]-coor[1]
-                            hitbox = depth_cv[int(coor[0]+box_w/scale):int(coor[2]-box_w/scale), int(coor[1]+box_h/scale):int(coor[3]-box_h/scale)]
-                            depth = np.mean(hitbox)
-                            box['depth']= depth
-                        else:
-                            depth = 'NA' 
+                            scale = 3  # 클수록 광범위, 2 이상이어야 함
+                            cutout_w = int(coor[2] - coor[0]) // scale
+                            cutout_h = int(coor[3] - coor[1]) // scale
+                            w_start, w_end = (
+                                coor[0] + cutout_w,
+                                coor[2] - cutout_w,
+                            )
+                            h_start, h_end = (
+                                coor[1] + cutout_h,
+                                coor[3] - cutout_h,
+                            )
 
+                            # (y,x) 순서임에 주의
+                            hitbox = depth_cv[h_start:h_end, w_start:w_end]
+                            depth = round(
+                                (255 - np.mean(hitbox)) * ALPHA_TO_RANGE, 4
+                            )
+
+                        else:
+                            depth = -1
+
+                        box = DetectorObject(
+                            *coor,
+                            confidence=round(float(conf), 5),
+                            cls=int(cls),
+                            name=self.names[int(cls)],
+                            depth=depth,
+                        )
                         boxes.append(box)
 
                         # Save text
@@ -135,8 +194,7 @@ class Detector:
                 
                 print(f'Inference Done. ({t2 - t1:.3f}s)')
 
-                results={}
-                results["yolo"]=boxes
+            results = DetectorInference(yolo=boxes)
 
                 # Save results (image with detections)
                 cv2.imwrite(save_path, im0)
