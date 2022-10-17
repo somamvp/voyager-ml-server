@@ -1,4 +1,4 @@
-**/__pycache__
-**/runs/
-**/traced_model.pt
+./app/__pycache__/
+./app/runs/
+./app/traced_model.pt
 Dockerfile
