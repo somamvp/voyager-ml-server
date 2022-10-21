@@ -1,229 +1,143 @@
-import os, natsort, sys
-from typing import List, Optional, Union
-from easydict import EasyDict
+import re
 import cv2
-
 import numpy as np
-import torch
-import torchvision.ops.boxes as bops
+
+from typing import List
+from easydict import EasyDict
+from loguru import logger
 
 import norfair
-from norfair import Detection, Paths, Tracker, Video
+from norfair.tracker import Detection, Tracker, TrackedObject
 from norfair.distances import frobenius, iou, mean_euclidean
 
+from app.yolov7_wrapper import DetectorObject
+
 TRACK_METHOD_PRESETS = {
-    "bbox": EasyDict({
-        "distance_function": iou,
-        "distance_threshold": 0.8,
-    }),
-
-    "centroid": EasyDict({
-        "distance_function": frobenius,
-        "distance_threshold": 100,
-    }),
-
-    "bbox_distance": EasyDict({
-        "distance_function": mean_euclidean,
-        "distance_threshold": 200,
-    }),
+    "bbox": EasyDict(
+        {
+            "distance_function": iou,
+            "distance_threshold": 0.8,
+        }
+    ),
+    "centroid": EasyDict(
+        {
+            "distance_function": frobenius,
+            "distance_threshold": 100,
+        }
+    ),
+    "bbox_distance": EasyDict(
+        {
+            "distance_function": mean_euclidean,
+            "distance_threshold": 200,
+        }
+    ),
 }
 
-def detector_detections_to_norfair_detections(
-    detections, track_points: str = "centroid"  # bbox or centroid
-) -> List[Detection]:
-    """convert detections_as_xywh to norfair detections"""
-    norfair_detections: List[Detection] = []
 
-    if track_points == "centroid":
-        for box in detections:
-            xmin, ymin, xmax, ymax = box["xmin"], box["ymin"], box["xmax"], box["ymax"]
-            centroid = np.array(
-                [ (xmin + xmax) / 2, (ymin + ymax) / 2 ]
+class TrackerWrapper:
+    """
+    norfair.Tracker 을 감싸 YOLOv7 custom detection object를 전달하고 결과를 저장
+    """
+
+    def __init__(self, track_points="bbox_distance") -> None:
+        if track_points not in TRACK_METHOD_PRESETS:
+            raise ValueError("track_points not supported!")
+
+        self.track_points = track_points
+        self.preset = TRACK_METHOD_PRESETS[track_points]
+
+        self.tracker = Tracker(
+            distance_function=self.preset.distance_function,
+            distance_threshold=self.preset.distance_threshold,
+            hit_counter_max=2,
+            initialization_delay=1,
+            filter_factory=norfair.filter.FilterPyKalmanFilterFactory(
+                R=0.001, Q=0.001, P=0.5
+            ),
+        )
+
+    def update(self, frame_data: List[DetectorObject]) -> List[DetectorObject]:
+        """
+        트래킹을 업데이트하고, 현재 트래커에서 valid한 object만을 필터링해서 반환
+        """
+        self.detections = self.detector_detections_to_norfair_detections(
+            frame_data
+        )
+        self.tracked_objects = self.tracker.update(self.detections)
+
+        logger.info(f"Tracked objects: {self}")
+
+        tracked_detector_object = [
+            obj.last_detection.data  # 저장했던 DetectorObject 다시 뽑아서 리턴
+            for obj in self.tracked_objects
+        ]
+
+        return tracked_detector_object
+
+    def save_result(self, frame: np.array, save_path: str):
+        if self.track_points == "centroid":
+            frame = norfair.draw_points(frame, self.detections)
+            frame = norfair.draw_tracked_objects(frame, self.tracked_objects)
+        elif self.track_points in ["bbox", "bbox_distance"]:
+            frame = norfair.draw_boxes(frame, self.detections)
+            frame = norfair.draw_tracked_boxes(
+                frame, self.tracked_objects, draw_labels=True, label_size=0.5
             )
-            scores = np.array([box["confidence"]])
-            norfair_detections.append(
-                Detection(
-                    points=centroid,
-                    scores=scores,
-                    label=box["class"],
+
+        if save_path:
+            cv2.imwrite(save_path, frame)
+
+    def detector_detections_to_norfair_detections(
+        self, detections: List[DetectorObject]  # bbox, centroid, bbox_distance
+    ) -> List[Detection]:
+        """
+        convert custom DetectorObject -> norfair Detection
+
+        Detection.data 에 원래의 DetectorObject가 저장됨
+        """
+        norfair_detections: List[Detection] = []
+
+        if self.track_points == "centroid":
+            for box in detections:
+                xmin, ymin, xmax, ymax = box.bbox_coordinate_diagonal()
+                centroid = np.array([(xmin + xmax) / 2, (ymin + ymax) / 2])
+                scores = np.array([box.confidence])
+                norfair_detections.append(
+                    Detection(
+                        points=centroid, scores=scores, label=box.cls, data=box
+                    )
                 )
-            )
-    elif track_points in ["bbox", "bbox_distance"]:
-        for box in detections:
-            xmin, ymin, xmax, ymax = box["xmin"], box["ymin"], box["xmax"], box["ymax"]
-            bbox = np.array(
-                [
-                    [xmin, ymin],
-                    [xmax, ymax],
-                ]
-            )
-            scores = np.array(
-                [ box["confidence"], box["confidence"] ]
-            )
-            norfair_detections.append(
-                Detection(
-                    points=bbox, scores=scores, label=box["class"]
+        elif self.track_points in ["bbox", "bbox_distance"]:
+            for box in detections:
+                xmin, ymin, xmax, ymax = box.bbox_coordinate_diagonal()
+                bbox = np.array(
+                    [
+                        [xmin, ymin],
+                        [xmax, ymax],
+                    ]
                 )
-            )
+                scores = np.array([box.confidence, box.confidence])
+                norfair_detections.append(
+                    Detection(
+                        points=bbox, scores=scores, label=box.cls, data=box
+                    )
+                )
 
-    return norfair_detections
+        return norfair_detections
 
+    def __repr__(self):
+        """
+        norfair.TrackedObject 의 __repr__을 파싱해, list 형식으로 표시
+        """
+        return f"[{', '.join(self.tracked_object_repr(obj) for obj in self.tracked_objects)}]"
 
-# def update(tracker: Tracker, detections: List[Detection], track_points="bbox_distance", save=False, save_dir=None):
+    def tracked_object_repr(self, tracked_obj: TrackedObject) -> str:
+        repr = tracked_obj.__repr__()
+        repr = re.sub(r"\033\[\d+m", "", repr)  # bold체 등 text decoration 제거
+        repr = re.sub(
+            r"Object_(\d+)",
+            rf"{tracked_obj.last_detection.data.name}_\1",
+            repr,
+        )  # "Object_1()" -> "person_1()" 클래스 이름 표시
 
-#     tracked_objects = tracker.update(detections=detections)
-
-#     if track_points == "centroid":
-#         norfair.draw_points(frame, detections)
-#         norfair.draw_tracked_objects(frame, tracked_objects)
-#     elif track_points in ["bbox", "bbox_distance"]:
-#         norfair.draw_boxes(frame, detections)
-#         norfair.draw_tracked_boxes(frame, tracked_objects, draw_labels=True, label_size=0.5)
-    
-    
-
-# class YOLO:
-#     def __init__(self, model_path: str, device: Optional[str] = None):
-#         if device is not None and "cuda" in device and not torch.cuda.is_available():
-#             raise Exception(
-#                 "Selected device='cuda', but cuda is not available to Pytorch."
-#             )
-#         # automatically set device if its None
-#         elif device is None:
-#             device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-#         if not os.path.exists(model_path):
-#             print("Model file error")
-#             exit()
-#             # os.system(
-#             #     f"wget https://github.com/WongKinYiu/yolov7/releases/download/v0.1/{os.path.basename(model_path)} -O {model_path}"
-#             # )
-
-#         # load model
-#         try:
-#             self.model = torch.hub.load("WongKinYiu/yolov7", "custom", model_path)
-#         except:
-#             raise Exception("Failed to load model from {}".format(model_path))
-
-#     def __call__(
-#         self,
-#         img: Union[str, np.ndarray],
-#         conf_threshold: float = 0.25,
-#         iou_threshold: float = 0.45,
-#         image_size: int = 640,
-#         classes: Optional[List[int]] = None,
-#     ) -> torch.tensor:
-
-#         self.model.conf = conf_threshold
-#         self.model.iou = iou_threshold
-#         if classes is not None:
-#             self.model.classes = classes
-#         detections = self.model(img, size=image_size)
-#         return detections
-
-
-# def center(points):
-#     return [np.mean(np.array(points), axis=0)]
-
-
-# def yolo_detections_to_norfair_detections(
-#     yolo_detections: torch.tensor, track_points: str = "centroid"  # bbox or centroid
-# ) -> List[Detection]:
-#     """convert detections_as_xywh to norfair detections"""
-#     norfair_detections: List[Detection] = []
-
-#     if track_points == "centroid":
-#         detections_as_xywh = yolo_detections.xywh[0]
-#         for detection_as_xywh in detections_as_xywh:
-#             centroid = np.array(
-#                 [detection_as_xywh[0].item(), detection_as_xywh[1].item()]
-#             )
-#             scores = np.array([detection_as_xywh[4].item()])
-#             norfair_detections.append(
-#                 Detection(
-#                     points=centroid,
-#                     scores=scores,
-#                     label=int(detection_as_xywh[-1].item()),
-#                 )
-#             )
-#     elif track_points in ["bbox", "bbox_distance"]:
-#         detections_as_xyxy = yolo_detections.xyxy[0]
-#         for detection_as_xyxy in detections_as_xyxy:
-#             bbox = np.array(
-#                 [
-#                     [detection_as_xyxy[0].item(), detection_as_xyxy[1].item()],
-#                     [detection_as_xyxy[2].item(), detection_as_xyxy[3].item()],
-#                 ]
-#             )
-#             scores = np.array(
-#                 [detection_as_xyxy[4].item(), detection_as_xyxy[4].item()]
-#             )
-#             norfair_detections.append(
-#                 Detection(
-#                     points=bbox, scores=scores, label=int(detection_as_xyxy[-1].item())
-#                 )
-#             )
-
-#     return norfair_detections
-
-
-# args = EasyDict({
-#     "detector_path": "extended_1.pt",
-#     "track_points": "bbox_distance",
-#     "img_size": 640,
-#     "conf_threshold": 0.25,
-#     "iou_threshold": 0.45,
-#     "classes": None,
-#     # ['Zebra_Cross', 'R_Signal', 'G_Signal', 'Braille_Block', 'person', 'dog', 'tree', 'car', 'bus', 'truck', 'motorcycle', 'bicycle', 'none', 'wheelchair', 'stroller', 'kickboard', 'bollard', 'manhole', 'labacon', 'bench', 'barricade', 'pot', 'table', 'chair', 'fire_hydrant', 'movable_signage', 'bus_stop'],
-#     "device": "cpu",
-# })
-
-# def track(frame: Union[str, np.ndarray], img_count: int):
-#     if isinstance(frame, str):
-#         frame = cv2.imread(frame)
-
-#     yolo_detections = model(
-#         frame,
-#         conf_threshold=args.conf_threshold,
-#         iou_threshold=args.iou_threshold,
-#         image_size=args.img_size,
-#         classes=args.classes,
-#     )
-#     detections = yolo_detections_to_norfair_detections(
-#         yolo_detections, track_points=args.track_points
-#     )
-
-#     tracked_objects = tracker.update(detections=detections)
-#     print(tracked_objects)
-
-#     if args.track_points == "centroid":
-#         norfair.draw_points(frame, detections)
-#         norfair.draw_tracked_objects(frame, tracked_objects)
-#     elif args.track_points in ["bbox", "bbox_distance"]:
-#         norfair.draw_boxes(frame, detections)
-#         norfair.draw_tracked_boxes(frame, tracked_objects, draw_labels=True, label_size=0.5)
-    
-#     cv2.imwrite(f"./tracked/tracked_{img_count}.jpg", frame)
-#     return yolo_detections, detections, tracked_objects
-
-# if __name__ == "__main__":
-
-#     model = YOLO(args.detector_path, device=args.device)
-#     model.model.to(args.device)
-
-#     track_presets = TRACK_METHOD_PRESETS[args.track_points]
-
-#     tracker = Tracker(
-#         distance_function=track_presets.distance_function,
-#         distance_threshold=track_presets.distance_threshold,
-#         hit_counter_max = 2,
-#         initialization_delay = 1,
-#         filter_factory=norfair.filter.FilterPyKalmanFilterFactory(R=0.001, Q=0.001, P=0.5)
-#     )
-
-#     img_list = natsort.natsorted(os.listdir("../Material3"))
-#     cnt=0
-#     for img in img_list:
-#         _ = track("../Material3/"+img, cnt)
-#         cnt+=1
-
+        return repr  # 앞뒤 따옴표 제거
