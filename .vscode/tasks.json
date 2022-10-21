@@ -30,6 +30,19 @@
             "problemMatcher": []
         },
         {
+            "label": "PortForward: ssh[docker]",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "-i",
+                "somaMVP.pem",
+                "-R",
+                "8002:127.0.0.1:5002",
+                "ubuntu@43.200.90.162"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "PortForward: fastapi",
             "type": "shell",
             "command": "ssh",
@@ -50,7 +63,7 @@
                 "-i",
                 "somaMVP.pem",
                 "-R",
-                "8888:127.0.0.1:8000",
+                "8888:127.0.0.1:8080",
                 "ubuntu@43.200.90.162"
             ],
             "problemMatcher": []
@@ -64,6 +77,19 @@
                 "somaMVP.pem",
                 "-R",
                 "5601:127.0.0.1:5601",
+                "ubuntu@43.200.90.162"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "PortForward: docker_ml",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "-i",
+                "somaMVP.pem",
+                "-R",
+                "9898:127.0.0.1:9898",
                 "ubuntu@43.200.90.162"
             ],
             "problemMatcher": []
