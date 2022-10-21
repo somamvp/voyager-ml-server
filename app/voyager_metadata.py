@@ -1,3 +1,31 @@
-
-YOLO_IDX_TO_NAME = ['Zebra_Cross', 'R_Signal', 'G_Signal', 'Braille_Block', 'person', 'dog', 'tree', 'car', 'bus', 'truck', 'motorcycle', 'bicycle', 'none', 'wheelchair', 'stroller', 'kickboard', 'bollard', 'manhole', 'labacon', 'bench', 'barricade', 'pot', 'table', 'chair', 'fire_hydrant', 'movable_signage', 'bus_stop']
-YOLO_NAME_TO_IDX = { name: idx for idx, name in enumerate(YOLO_IDX_TO_NAME) }
+YOLO_PT_FILE = "extended_4.pt"
+YOLO_IDX_TO_NAME = [
+    "Zebra_Cross",
+    "R_Signal",
+    "G_Signal",
+    "Braille_Block",
+    "person",
+    "dog",
+    "tree",
+    "car",
+    "bus",
+    "truck",
+    "motorcycle",
+    "bicycle",
+    "none",
+    "wheelchair",
+    "stroller",
+    "kickboard",
+    "bollard",
+    "manhole",
+    "labacon",
+    "bench",
+    "barricade",
+    "pot",
+    "table",
+    "chair",
+    "fire_hydrant",
+    "movable_signage",
+    "bus_stop",
+]
+YOLO_NAME_TO_IDX = {name: idx for idx, name in enumerate(YOLO_IDX_TO_NAME)}
