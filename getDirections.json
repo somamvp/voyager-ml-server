@@ -1,0 +1,443 @@
+{
+    "request": {
+        "startY": 37.5036163,
+        "startX": 127.0448946,
+        "endY": 37.5042356,
+        "endX": 127.0498941
+    },
+    "response": {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        127.0449510127356,
+                        37.50349662735116
+                    ]
+                },
+                "properties": {
+                    "srid": 4326,
+                    "totalLength": 482.1957618004707,
+                    "totalTime": 348,
+                    "index": 0
+                },
+                "id": "start"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [
+                            127.0449510127356,
+                            37.50349662735116
+                        ],
+                        [
+                            127.04554141712714,
+                            37.50367326993244
+                        ]
+                    ]
+                },
+                "properties": {
+                    "nodeAId": "11680#22322",
+                    "nodeBId": "start",
+                    "length": 55.74298792591308,
+                    "incline": 0,
+                    "width": null,
+                    "srid": 4326,
+                    "pathType": "0",
+                    "time": 41,
+                    "difficulty": 0,
+                    "index": 0
+                },
+                "id": "r_11680#14309_A"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        127.04554141712714,
+                        37.50367326993244
+                    ]
+                },
+                "properties": {
+                    "srid": 4326,
+                    "maneuver": "straight",
+                    "index": 1
+                },
+                "id": "11680#22322"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [
+                            127.04554141712714,
+                            37.50367326993244
+                        ],
+                        [
+                            127.04561075478121,
+                            37.50369471859919
+                        ]
+                    ]
+                },
+                "properties": {
+                    "nodeAId": "11680#22320",
+                    "nodeBId": "11680#22322",
+                    "length": 6.576852,
+                    "incline": 0,
+                    "width": null,
+                    "srid": 4326,
+                    "pathType": "1",
+                    "crossingType": "1",
+                    "time": 5,
+                    "difficulty": 0,
+                    "index": 1
+                },
+                "id": "c_11680#5479"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        127.04561075478121,
+                        37.50369471859919
+                    ]
+                },
+                "properties": {
+                    "srid": 4326,
+                    "maneuver": "straight",
+                    "index": 2
+                },
+                "id": "11680#22320"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [
+                            127.04561075478121,
+                            37.50369471859919
+                        ],
+                        [
+                            127.04568348330571,
+                            37.50371672108192
+                        ]
+                    ]
+                },
+                "properties": {
+                    "nodeAId": "11680#22319",
+                    "nodeBId": "11680#22320",
+                    "length": 6.8787837,
+                    "incline": 0,
+                    "width": null,
+                    "srid": 4326,
+                    "pathType": "0",
+                    "time": 5,
+                    "difficulty": 0,
+                    "index": 2
+                },
+                "id": "r_11680#12784"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        127.04568348330571,
+                        37.50371672108192
+                    ]
+                },
+                "properties": {
+                    "srid": 4326,
+                    "maneuver": "turnRight",
+                    "index": 3
+                },
+                "id": "11680#22319"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [
+                            127.04568348330571,
+                            37.50371672108192
+                        ],
+                        [
+                            127.04585602722966,
+                            37.50334214892387
+                        ]
+                    ]
+                },
+                "properties": {
+                    "nodeAId": "11680#22219",
+                    "nodeBId": "11680#22319",
+                    "length": 44.283745,
+                    "incline": 0,
+                    "width": null,
+                    "srid": 4326,
+                    "pathType": "1",
+                    "crossingType": "1",
+                    "time": 32,
+                    "difficulty": 0,
+                    "index": 3
+                },
+                "id": "c_11680#6680"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        127.04585602722966,
+                        37.50334214892387
+                    ]
+                },
+                "properties": {
+                    "srid": 4326,
+                    "maneuver": "turnLeft",
+                    "index": 4
+                },
+                "id": "11680#22219"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [
+                            127.04585602722966,
+                            37.50334214892387
+                        ],
+                        [
+                            127.04722609388428,
+                            37.50374328504329
+                        ]
+                    ]
+                },
+                "properties": {
+                    "nodeAId": "11680#22219",
+                    "nodeBId": "11680#22221",
+                    "length": 129.0649,
+                    "incline": 0,
+                    "width": null,
+                    "srid": 4326,
+                    "pathType": "0",
+                    "time": 93,
+                    "difficulty": 0,
+                    "index": 4
+                },
+                "id": "r_11680#15484"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        127.04722609388428,
+                        37.50374328504329
+                    ]
+                },
+                "properties": {
+                    "srid": 4326,
+                    "maneuver": "straight",
+                    "index": 5
+                },
+                "id": "11680#22221"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [
+                            127.04722609388428,
+                            37.50374328504329
+                        ],
+                        [
+                            127.04739840143158,
+                            37.50378144189054
+                        ]
+                    ]
+                },
+                "properties": {
+                    "nodeAId": "11680#22221",
+                    "nodeBId": "11680#22222",
+                    "length": 15.8132305,
+                    "incline": 0,
+                    "width": null,
+                    "srid": 4326,
+                    "pathType": "1",
+                    "crossingType": "1",
+                    "time": 12,
+                    "difficulty": 0,
+                    "index": 5
+                },
+                "id": "c_11680#6678"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        127.04739840143158,
+                        37.50378144189054
+                    ]
+                },
+                "properties": {
+                    "srid": 4326,
+                    "maneuver": "straight",
+                    "index": 6
+                },
+                "id": "11680#22222"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [
+                            127.04739840143158,
+                            37.50378144189054
+                        ],
+                        [
+                            127.0489842335246,
+                            37.50425936868564
+                        ]
+                    ]
+                },
+                "properties": {
+                    "nodeAId": "11680#22222",
+                    "nodeBId": "11680#22223",
+                    "length": 149.91795,
+                    "incline": 0,
+                    "width": null,
+                    "srid": 4326,
+                    "pathType": "0",
+                    "time": 108,
+                    "difficulty": 0,
+                    "index": 6
+                },
+                "id": "r_11680#15448"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        127.0489842335246,
+                        37.50425936868564
+                    ]
+                },
+                "properties": {
+                    "srid": 4326,
+                    "maneuver": "straight",
+                    "index": 7
+                },
+                "id": "11680#22223"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [
+                            127.0489842335246,
+                            37.50425936868564
+                        ],
+                        [
+                            127.0492366792105,
+                            37.50432973690074
+                        ]
+                    ]
+                },
+                "properties": {
+                    "nodeAId": "11680#22223",
+                    "nodeBId": "11680#23885",
+                    "length": 23.648212,
+                    "incline": 0,
+                    "width": null,
+                    "srid": 4326,
+                    "pathType": "1",
+                    "crossingType": "1",
+                    "time": 18,
+                    "difficulty": 0,
+                    "index": 7,
+                    "light": true
+                },
+                "id": "c_11680#5437"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        127.0492366792105,
+                        37.50432973690074
+                    ]
+                },
+                "properties": {
+                    "srid": 4326,
+                    "maneuver": "straight",
+                    "index": 8
+                },
+                "id": "11680#23885"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [
+                            127.0492366792105,
+                            37.50432973690074
+                        ],
+                        [
+                            127.04947326330539,
+                            37.50440382978885
+                        ],
+                        [
+                            127.04976591084402,
+                            37.5044954567533
+                        ]
+                    ]
+                },
+                "properties": {
+                    "nodeAId": "end",
+                    "nodeBId": "11680#23885",
+                    "length": 50.26910067455765,
+                    "incline": 0,
+                    "width": 0,
+                    "srid": 4326,
+                    "pathType": "0",
+                    "time": 37,
+                    "difficulty": 0,
+                    "index": 8
+                },
+                "id": "r_11680#12531_Ar_11680#12496"
+            },
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        127.04976591084402,
+                        37.5044954567533
+                    ]
+                },
+                "properties": {
+                    "srid": 4326,
+                    "index": 9
+                },
+                "id": "end"
+            }
+        ]
+    }
+}
