@@ -8,6 +8,8 @@ DELETE/
 *.gif
 *.png
 
+#log
+*.out
 
 # YOLO files
 runs/
