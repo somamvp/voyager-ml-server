@@ -1,4 +1,4 @@
-import time
+import time, os
 
 import easydict, cv2
 import numpy as np
@@ -29,7 +29,12 @@ opt = easydict.EasyDict(
         "view_img": False,
         "no_trace": False,
         "nosave": False,
-        "project": "runs/detect",
+        "project": (
+            # 도커 환경 여부에 따라 로그 디렉토리 변경
+            "docker/runs/detect"
+            if os.environ.get("docker") == "True"
+            else "runs/detect"
+        ),
         "save_conf": True,
         "save_txt": True,
         "update": False,
