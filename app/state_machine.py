@@ -46,16 +46,12 @@ class Position:
         )  # 두 방향의 짧은 쪽 각 차이
         return (
             abs(heading_diff) < 10
-            and abs(self.x - to.x) < 0.0001
-            and abs(self.y - to.y) < 0.0001
+            and self.speed < 0.5
+            # and (abs(self.x - to.x) < 0.00001 and abs(self.y - to.y) < 0.00001)
         )
 
 
 class StateMachine:
-
-    cross_not_disappear_if_position_similar = (
-        True  # Real World Testing -> True, Fake Testing -> False
-    )
 
     is_guiding_crossroad = False
     last_trafficlight = TrafficLight.Red
@@ -75,9 +71,12 @@ class StateMachine:
     def green(self):
         return self._green > 0
 
-    def __init__(self, should_light_exist=True, use_tracking=True):
+    def __init__(
+        self, should_light_exist=True, use_tracking=True, use_gps=True
+    ):
         self.should_light_exist = should_light_exist
 
+        self.cross_not_disappear_if_position_similar = use_gps
         self.position: Position = None
         self._cross, self._red, self._green = 0, 0, 0
 
@@ -94,7 +93,7 @@ class StateMachine:
     def newFrame(
         self,
         frame_data: List[DetectorObject],
-        position=Position(0.0, 1.1, 180.0),
+        position: Optional[Position],
     ):
         if self.use_tracking:
             pass
@@ -108,14 +107,15 @@ class StateMachine:
             frame_data, cases=["Zebra_Cross", "R_Signal", "G_Signal"]
         )
 
-        if position.similar_to(self.position):
-            if cross:
-                self._cross = cross
+        if position is None:
+            self._cross = cross
+        elif position.similar_to(self.position):
+
+            # 위치가 변하지 않으면, 횡단보도가 사라질 리 없으므로 횡단보도 박스가 없어져도 반영하지 않는다.
+            if not cross and self.cross_not_disappear_if_position_similar:
+                pass
             else:
-                if self.cross_not_disappear_if_position_similar:
-                    pass  # 위치가 변하지 않으면, 횡단보도가 사라질 리 없으므로 횡단보도 박스가 없어져도 반영하지 않는다.
-                else:
-                    self._cross = cross
+                self._cross = cross
 
             logger.info(
                 f"new position {position} similar; cross {cross}, self.cross {self.cross}"

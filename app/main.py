@@ -87,6 +87,10 @@ async def file_upload(
     source: bytes = File(...),
     session_no: int = Form(default=1, alias="sequenceNo"),
     is_rot: bool = Form(True),
+    gps_x: Optional[float] = Form(None, alias="gpsX"),
+    gps_y: Optional[float] = Form(None, alias="gpsY"),
+    gps_heading: Optional[float] = Form(None, alias="gpsHeading"),
+    gps_speed: Optional[float] = Form(None, alias="gpsSpeed"),
 ):
     # High-frequency Acting
     tick = time.time()
@@ -114,7 +118,9 @@ async def file_upload(
         rgb, save_path=f"{detector.save_dir / log_str}_tracking.jpg"
     )
 
-    stateMachine.newFrame(tracked_objects)
+    gps_infos = [gps_x, gps_y, gps_heading, gps_speed]
+    position = None if (None in gps_infos) else Position(*gps_infos)
+    stateMachine.newFrame(tracked_objects, position=position)
     guide_enum = stateMachine.guides
 
     logger.info("사용자 안내: {}", guide_enum)
