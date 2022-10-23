@@ -1,10 +1,9 @@
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Dict, Tuple, Union
-from loguru import logger
+from typing import List, Dict, Optional, Union
 
-from requests import head
+from loguru import logger
 from easydict import EasyDict
 
 from app.yolov7_wrapper import DetectorObject
@@ -71,33 +70,21 @@ class StateMachine:
     def green(self):
         return self._green > 0
 
-    def __init__(
-        self, should_light_exist=True, use_tracking=True, use_gps=True
-    ):
+    def __init__(self, should_light_exist=True, use_gps=True):
         self.should_light_exist = should_light_exist
 
         self.cross_not_disappear_if_position_similar = use_gps
         self.position: Position = None
         self._cross, self._red, self._green = 0, 0, 0
 
-        self.use_tracking = use_tracking
-        if use_tracking:
-            self.configure_tracking()
-
     def serialize(self) -> str:
         return ""
-
-    def configure_tracking(self):
-        pass
 
     def newFrame(
         self,
         frame_data: List[DetectorObject],
-        position: Optional[Position],
+        position: Optional[Position] = None,
     ):
-        if self.use_tracking:
-            pass
-
         self.guides = []
 
         if self.position is None:
@@ -152,7 +139,6 @@ class StateMachine:
 
                 if not self.is_guiding_crossroad:
                     self.start_guiding_crossroad()
-
                 elif self.current_trafficlight != self.last_trafficlight:
                     self.on_trafficlight_changed()
 
@@ -161,7 +147,6 @@ class StateMachine:
 
                 if not self.is_guiding_crossroad:
                     self.start_guiding_crossroad()
-
                 elif self.current_trafficlight != self.last_trafficlight:
                     self.on_trafficlight_changed()
 
@@ -211,20 +196,21 @@ class StateMachine:
         isDetected = cross_exists and signal_exists
         return isDetected
 
-    def start_guiding_crossroad(self):
+    def start_guiding_crossroad(self, initial_mention=True):
         self.is_guiding_crossroad = True
         if not self.should_light_exist:
-            self.guide("신호 없는 횡단보도.")
+            self.guide("무신호 횡단보도 감지됨.")
             return
 
         self.last_trafficlight = self.current_trafficlight
 
-        self.guide("횡단보도 신호 안내.")
+        if initial_mention:
+            self.guide("횡단보도 감지됨.")
 
         if self.current_trafficlight == TrafficLight.Red:
-            self.guide("빨간불입니다. 정지하세요.")
+            self.guide("빨간불입니다.")
         elif self.current_trafficlight == TrafficLight.Green:
-            self.guide("초록불입니다. 다음 신호를 기다리세요.")
+            self.guide("초록불입니다.")
         elif self.current_trafficlight == TrafficLight.NotFound:
             self.guide("신호등 인식 불가! 시야를 움직여 주세요.")
 
@@ -236,7 +222,7 @@ class StateMachine:
 
         if self.last_trafficlight == TrafficLight.NotFound:
             self.guide("신호등 정상 인식.")
-            self.start_guiding_crossroad()
+            self.start_guiding_crossroad(initial_mention=False)
         else:
             if self.current_trafficlight == TrafficLight.Red:
                 self.guide("신호가 빨간불로 바뀌었습니다.")

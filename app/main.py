@@ -2,19 +2,18 @@ import time, os
 
 import easydict, cv2
 import numpy as np
-from typing import Dict
+from typing import Dict, Optional
 from datetime import datetime
 from fastapi import FastAPI, File, Form
 from loguru import logger
 
 import app.description as description
-from app.state_machine import StateMachine
+from app.state_machine import Position, StateMachine
 from app.tracking import TrackerWrapper
 from app.yolov7_wrapper import Detector, DetectorInference
 from app.voyager_metadata import YOLO_PT_FILE
 
 
-model_name = YOLO_PT_FILE
 opt = easydict.EasyDict(
     {
         "agnostic_nms": False,
@@ -38,7 +37,7 @@ opt = easydict.EasyDict(
         "save_conf": True,
         "save_txt": True,
         "update": False,
-        "weights": [model_name],
+        "weights": [YOLO_PT_FILE],
     }
 )
 
@@ -180,8 +179,8 @@ async def file_update(
 
 
 @app.get("/start")
-async def start():
+async def start(should_light_exist: bool):
     logger.info("--------restarting state machine----------")
     global stateMachine
-    stateMachine = StateMachine()
+    stateMachine = StateMachine(should_light_exist=should_light_exist)
     return ""

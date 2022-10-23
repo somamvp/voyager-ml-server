@@ -36,7 +36,7 @@ opt = easydict.EasyDict(
     }
 )
 
-stateMachine = StateMachine()
+stateMachine = StateMachine(use_gps=False)
 tracker = TrackerWrapper()
 detector = Detector(opt)
 
