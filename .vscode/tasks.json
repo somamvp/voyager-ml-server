@@ -29,7 +29,7 @@
             ],
             "problemMatcher": []
         },
-        {
+                {
             "label": "PortForward: ssh[docker]",
             "type": "shell",
             "command": "ssh",
@@ -43,14 +43,27 @@
             "problemMatcher": []
         },
         {
-            "label": "PortForward: fastapi",
+            "label": "PortForward: ws server",
             "type": "shell",
             "command": "ssh",
             "args": [
                 "-i",
                 "somaMVP.pem",
                 "-R",
-                "5001:127.0.0.1:8000",
+                "5000:127.0.0.1:8000",
+                "ubuntu@43.200.90.162"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "PortForward: dk server",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "-i",
+                "somaMVP.pem",
+                "-R",
+                "5001:127.0.0.1:8001",
                 "ubuntu@43.200.90.162"
             ],
             "problemMatcher": []
