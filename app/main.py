@@ -132,17 +132,21 @@ async def file_upload(
     logger.info("사용자 안내: {}", guide_enum)
 
     # 전방 묘사
-    guide_obj = description.inform(
-        result_dict[session_no].yolo, img_size=img_size
+    descrip_str, warning_str = description.inform(
+        depth_map=depth_cv, yolo=result_dict[session_no].yolo, img_size=img_size
     )
 
     logger.info("/upload total runtime: {}", (time.time() - tick))
-    logger.info(f"guide object list: {guide_obj}")
+    logger.info(f"descrip_str: {descrip_str}, warning_str: {warning_str}")
 
     return {
         "guide": guide_enum,
-        "yolo": [obj.__dict__ for obj in guide_obj],
-    }  # 정렬/솎아진 상태의 디텍션 정보
+        # 정렬/솎아진 상태의 디텍션 정보
+        # "yolo": [obj.__dict__ for obj in guide_dict["yolo"]],
+        "yolo": descrip_str,
+        # Warning String
+        "warning": warning_str,
+    }
 
 
 @app.post("/update")
@@ -172,17 +176,18 @@ async def file_update(
         "발견된 물체: {}",
         [result["name"] for result in result_dict[session_no].yolo],
     )
-    guide_obj = description.inform(
+    guide_dict = description.inform(
         result_dict[session_no].yolo, img_size=img_size
     )
 
     logger.info("/update total runtime: {}", (time.time() - tick))
-    return {"high_freq": high_freq, "yolo": guide_obj}  # 정렬/솎아진 상태의 디텍션 정보
+    return {"high_freq": high_freq, "yolo": guide_dict}  # 정렬/솎아진 상태의 디텍션 정보
 
 
 @app.get("/start")
 async def start(should_light_exist: bool):
-    logger.info("--------restarting state machine----------")
-    global stateMachine
+    logger.info("--------restarting state machine & tracker----------")
+    global stateMachine, tracker
     stateMachine = StateMachine(should_light_exist=should_light_exist)
+    tracker = TrackerWrapper()
     return ""

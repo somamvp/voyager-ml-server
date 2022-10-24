@@ -195,9 +195,6 @@ class Detector:
 
             for det in pred:  # detections per image, (n, 6)
 
-                if len(det) == 0:
-                    continue
-
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(
                     img_pad.shape[2:], det[:, :4], img_orig.shape
@@ -205,8 +202,12 @@ class Detector:
 
                 img_save = img_orig.copy()
 
+                if len(det) == 0:
+                    continue
+
                 # Write results
-                for *coor, conf, cls in reversed(det):
+                for obj in reversed(det):
+                    *coor, conf, cls = obj.tolist()
 
                     depth = -1
                     if depth_cv is not None:
