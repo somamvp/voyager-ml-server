@@ -1,3 +1,8 @@
+# local testing files
+tests/
+tracked/
+RGBD/
+
 # Trash can
 DELETE/
 
@@ -8,7 +13,7 @@ DELETE/
 *.gif
 *.png
 
-#log
+# Nohup log files
 *.out
 
 # YOLO files
