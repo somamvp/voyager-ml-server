@@ -1,3 +1,5 @@
+"""python yolo_tracking_video_test.py /home/soma1/MVP/voyager-juwon/tests/IMG_0265.MOV > video_test.log 2>&1"""
+
 import time, argparse
 
 import easydict, cv2
@@ -69,9 +71,9 @@ def test(video_path=None, process_every=30):
         )
 
         # Tracking & State Machine
-        tracked_objects = tracker.update(result_dict[session_no].yolo)
-        tracker.save_result(
-            rgb, save_path=f"{detector.save_dir / log_str}_tracking.jpg"
+        tracked_objects = tracker.update(
+            result_dict[session_no].yolo,
+            validate_zebra_cross=(rgb.shape[0] // 2),
         )
 
         stateMachine.newFrame(tracked_objects)

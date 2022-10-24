@@ -117,7 +117,9 @@ async def file_upload(
     )
 
     # Tracking & State Machine
-    tracked_objects = tracker.update(result_dict[session_no].yolo)
+    tracked_objects = tracker.update(
+        result_dict[session_no].yolo, validate_zebra_cross=(img_size[0] // 2)
+    )
     tracker.save_result(
         rgb, save_path=f"{detector.save_dir / log_str}_tracking.jpg"
     )

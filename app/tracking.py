@@ -2,7 +2,7 @@ import re
 import cv2
 import numpy as np
 
-from typing import List
+from typing import List, Optional
 from easydict import EasyDict
 from loguru import logger
 
@@ -56,23 +56,56 @@ class TrackerWrapper:
             ),
         )
 
-    def update(self, frame_data: List[DetectorObject]) -> List[DetectorObject]:
-        """
-        트래킹을 업데이트하고, 현재 트래커에서 valid한 object만을 필터링해서 반환
+    def update(
+        self,
+        frame_data: List[DetectorObject],
+        validate_zebra_cross: Optional[int] = None,
+    ) -> List[DetectorObject]:
+        """트래킹을 업데이트하고, 현재 트래커에서 valid한 object만을 필터링해서 반환
+
+        Args:
+            frame_data (List[DetectorObject]): `yolov7_wrapper.Detector` 에서 출력한 현재 프레임의 객체 인식 결과
+            validate_zebra_cross (Optional[int], optional): 횡단보도를 멀리서부터 잡는 현상을 방지하기 위해,
+                이 인자로 주어진 Y픽셀 선보다 아래에 있는 횡단보도 오브젝트만을 반환함. Defaults to None.
+
+        Returns:
+            List[DetectorObject]: 트래커에 의해 이전 프레임의 결과와 연결해, 현재 valid한 DetectorObject만을 필터링해서 반환
         """
         self.detections = self.detector_detections_to_norfair_detections(
             frame_data
         )
         self.tracked_objects = self.tracker.update(self.detections)
 
+        if validate_zebra_cross:
+            self.mark_zebra_cross_under(
+                y_limit=validate_zebra_cross,
+                tracked_objects=self.tracked_objects,
+            )
+
         logger.info(f"Tracked objects: {self}")
 
         tracked_detector_object = [
             obj.last_detection.data  # 저장했던 DetectorObject 다시 뽑아서 리턴
             for obj in self.tracked_objects
+            if getattr(obj, "has_crossed_line", True)
         ]
 
         return tracked_detector_object
+
+    def mark_zebra_cross_under(
+        self, y_limit: int, tracked_objects: List[TrackedObject]
+    ) -> List[TrackedObject]:
+
+        for obj in tracked_objects:
+            if (
+                obj.last_detection.data.cls == 0
+                and getattr(obj, "has_crossed_line", False) is False
+            ):
+                obj.has_crossed_line = obj.estimate[:, 0].max() > y_limit
+                if obj.has_crossed_line:
+                    logger.info(
+                        f"{self.tracked_object_repr(obj)} 주어진 Y값 {y_limit} 넘음; 유효한 횡단보도로 인식"
+                    )
 
     def save_result(self, frame: np.array, save_path: str):
         if self.track_points == "centroid":
