@@ -1,17 +1,21 @@
 import time, os
-
+import app.description as description
 import easydict, cv2
 import numpy as np
+
 from typing import Dict, Optional
 from datetime import datetime
 from fastapi import FastAPI, File, Form
 from loguru import logger
+from pathlib import Path
 
-import app.description as description
+
 from app.state_machine import Position, StateMachine
 from app.tracking import TrackerWrapper
 from app.yolov7_wrapper import v7Detector, DetectorInference
-from app.voyager_metadata import YOLO_PT_FILE
+from app.yolov5_wrapper import v5Detector
+from app.voyager_metadata import YOLOV5_PT_FILE, YOLOV7_PT_FILE
+from app.yolov7.utils.general import increment_path
 
 
 opt = easydict.EasyDict(
@@ -37,14 +41,21 @@ opt = easydict.EasyDict(
         "save_conf": True,
         "save_txt": True,
         "update": False,
-        "weights": [YOLO_PT_FILE],
+        "weights": [YOLOV7_PT_FILE],
     }
 )
 
+save_dir = Path(
+    increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok)
+)  # increment run
 app = FastAPI()
 stateMachine = StateMachine()
 tracker = TrackerWrapper()
-v7detector = v7Detector(opt)
+v7detector = v7Detector(opt, save_dir)
+v5detector = v5Detector(YOLOV5_PT_FILE, save_dir)
+
+
+logger.info(f"Using models: {YOLOV5_PT_FILE}, {YOLOV7_PT_FILE}")
 
 # 세션NO : detection result, 서비스 배포 시 여러장의 이미지를 한꺼번에 추론시키는 경우를 대비해 구축해놓았음.
 # 추후 메모리 누수 막기 위해 초기화시키는 알고리즘 필요
@@ -108,21 +119,19 @@ async def file_upload(
     img_size = [rgb.shape[0], rgb.shape[1]]
 
     # YOLO 추론
-    result_dict[session_no] = v7detector.inference(
-        source=rgb, im_id=session_no, save_name=log_str, depth_cv=depth_cv
+    result_dict[session_no] = v5detector.inference(
+        source=rgb, im_id=session_no, save_name=log_str, depth_cv=None
     )
 
     logger.info(
-        f"발견된 물체: {[box.name for box in result_dict[session_no].yolo]}, time: {time.time() - tick}",
+        f"발견된 물체(횡단보도 안내): {[box.name for box in result_dict[session_no].yolo]}, time: {time.time() - tick}",
     )
 
     # Tracking & State Machine
     tracked_objects = tracker.update(
         result_dict[session_no].yolo, validate_zebra_cross=(img_size[0] // 2)
     )
-    tracker.save_result(
-        rgb, save_path=f"{v7detector.save_dir / log_str}_tracking.jpg"
-    )
+    tracker.save_result(rgb, save_path=f"{save_dir / log_str}_tracking.jpg")
 
     gps_infos = [gps_x, gps_y, gps_heading, gps_speed]
     position = None if (None in gps_infos) else Position(*gps_infos)
@@ -148,6 +157,7 @@ async def file_upload(
         "yolo": descrip_str,
         "warning": warning_str,
     }
+
 
 @app.post("/description")
 async def file_upload(
@@ -183,9 +193,7 @@ async def file_upload(
     tracked_objects = tracker.update(
         result_dict[session_no].yolo, validate_zebra_cross=(img_size[0] // 2)
     )
-    tracker.save_result(
-        rgb, save_path=f"{v7detector.save_dir / log_str}_tracking.jpg"
-    )
+    tracker.save_result(rgb, save_path=f"{save_dir / log_str}_tracking.jpg")
 
     gps_infos = [gps_x, gps_y, gps_heading, gps_speed]
     position = None if (None in gps_infos) else Position(*gps_infos)
@@ -211,7 +219,6 @@ async def file_upload(
         "yolo": descrip_str,
         "warning": warning_str,
     }
-
 
 
 @app.post("/update")
