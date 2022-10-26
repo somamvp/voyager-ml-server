@@ -1,20 +1,17 @@
 import os, shutil
-from typing import List
-from pathlib import Path
-from datetime import datetime
-from dataclasses import dataclass, fields
-
-from torch import cudnn_convolution_transpose
-
-from loguru import logger
 import cv2, torch
 import numpy as np
 
-from app.wrapper_essential import DetectorObject, DetectorInference
-
+from typing import List
+from pathlib import Path
 from datetime import datetime
+from torch import cudnn_convolution_transpose
 from loguru import logger
 
+
+from app.wrapper_essential import DetectorObject, DetectorInference
+from datetime import datetime
+from loguru import logger
 from models.experimental import attempt_load
 from utils.datasets import LoadImages, letterbox
 from utils.general import (
@@ -33,57 +30,8 @@ from utils.torch_utils import (
 ALPHA_TO_RANGE = 20.0 / 255.0
 
 
-@dataclass
-class DetectorObject:
-    """
-    YOLO detector 객체로 사용하던 dict 를 감싼 오브젝트.
-    보통의 dict 와 같이 obj["attr"] = value 처럼 사용할 수도 있다.
-    """
-
-    xmin: float
-    ymin: float
-    xmax: float
-    ymax: float
-
-    confidence: float
-    cls: int
-    name: str
-
-    depth: float
-
-    def get_dict(self) -> dict:
-        """객체의 dict 표현을 반환. obj["attr"] = value 와 같이 사용"""
-        return self.__dict__
-
-    def __getitem__(self, item):
-        return getattr(self, item, None)
-
-    def __setitem__(self, item, value):
-        setattr(self, item, value)
-
-    def bbox_coordinate_diagonal(self) -> List[float]:
-        return [self.xmin, self.ymin, self.xmax, self.ymax]
-
-    @staticmethod
-    def from_dict(argDict: dict) -> "DetectorObject":
-        fieldSet = {f.name for f in fields(DetectorObject) if f.init}
-        filteredArgDict = {k: v for k, v in argDict.items() if k in fieldSet}
-        return DetectorObject(**filteredArgDict)
-
-
-@dataclass
-class DetectorInference:
-    yolo: List[DetectorObject]
-
-    def __getitem__(self, item):
-        return getattr(self, item, None)
-
-    def __setitem__(self, item, value):
-        setattr(self, item, value)
-
-
-class Detector:
-    def __init__(self, opt={}):
+class v7Detector:
+    def __init__(self, opt, save_dir):
         self.opt = opt
         self.save_dir = save_dir
         self.weights, self.save_txt, self.imgsz, self.trace = (

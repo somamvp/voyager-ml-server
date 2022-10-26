@@ -1,5 +1,6 @@
 YOLOV5_PT_FILE = "basicv5.pt"
-YOLOV7_PT_FILE = "extended_4.pt"
+YOLOV7_BASIC_PT_FILE = "wesee7_4.pt"
+YOLOV7_DESC_PT_FILE = "extended_4.pt"
 YOLO_IDX_TO_NAME = [
     "Zebra_Cross",
     "R_Signal",

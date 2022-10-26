@@ -6,7 +6,7 @@ from typing import List, Dict, Optional, Union
 from loguru import logger
 from easydict import EasyDict
 
-from app.yolov7_wrapper import DetectorObject
+from app.wrapper_essential import DetectorObject
 
 YOLO_CLASS_NAMES = {"R_Signal": "Red", "G_Signal": "Green"}
 

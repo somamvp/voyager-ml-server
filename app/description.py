@@ -4,7 +4,7 @@ import math
 from typing import List
 from loguru import logger
 from app.voyager_metadata import YOLO_NAME_TO_KOREAN, YOLO_THRES, YOLO_OBS_TYPE
-from app.yolov7_wrapper import DetectorObject
+from app.wrapper_essential import DetectorObject
 
 RANGE_TO_ALPHA = 255 / 20
 DEV_YOLO_BASED_WARNING = False
@@ -129,7 +129,7 @@ def inform(
 
     # Warning mesg by depth map
     else:
-        warning_msg = ''
+        warning_msg = ""
 
     logger.info(
         f"User trigger description: {user_trigger_msg}, Warning message: {warning_msg}"

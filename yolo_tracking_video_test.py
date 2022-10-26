@@ -13,9 +13,9 @@ import app.description as description
 from app.state_machine import StateMachine
 from app.tracking import TrackerWrapper
 from app.yolov7_wrapper import Detector, DetectorInference
-from app.voyager_metadata import YOLOV7_PT_FILE
+from app.voyager_metadata import YOLOV7_DESC_PT_FILE
 
-model_name = YOLOV7_PT_FILE
+model_name = YOLOV7_DESC_PT_FILE
 opt = easydict.EasyDict(
     {
         "agnostic_nms": False,

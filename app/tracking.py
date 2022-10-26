@@ -10,7 +10,7 @@ import norfair
 from norfair.tracker import Detection, Tracker, TrackedObject
 from norfair.distances import frobenius, iou, mean_euclidean
 
-from app.yolov7_wrapper import DetectorObject
+from app.wrapper_essential import DetectorObject
 
 TRACK_METHOD_PRESETS = {
     "bbox": EasyDict(
@@ -97,11 +97,11 @@ class TrackerWrapper:
     ) -> List[TrackedObject]:
 
         for obj in tracked_objects:
-            if (
-                obj.last_detection.data.cls == 0
-                and getattr(obj, "has_crossed_line", False) is False
+            if (obj.last_detection.data.cls == 0) and not getattr(
+                obj, "has_crossed_line", False
             ):
-                obj.has_crossed_line = obj.estimate[:, 0].max() > y_limit
+                obj.has_crossed_line = obj.estimate[:, 1].max() > y_limit
+                logger.info(f"{obj.estimate}")
                 if obj.has_crossed_line:
                     logger.info(
                         f"{self.tracked_object_repr(obj)} 주어진 Y값 {y_limit} 넘음; 유효한 횡단보도로 인식"

@@ -1,3 +1,4 @@
+import json, sys
 import time, os
 import app.description as description
 import easydict, cv2
@@ -12,38 +13,53 @@ from pathlib import Path
 
 from app.state_machine import Position, StateMachine
 from app.tracking import TrackerWrapper
-from app.yolov7_wrapper import v7Detector, DetectorInference
-from app.yolov5_wrapper import v5Detector
-from app.voyager_metadata import YOLOV5_PT_FILE, YOLOV7_PT_FILE
-from app.yolov7.utils.general import increment_path
+from app.wrapper_essential import DetectorInference, DetectorObject
+from app.yolov7_wrapper import v7Detector
+from app.wrapper_essential import increment_path
 
+# sys.path.pop()
 
-opt = easydict.EasyDict(
-    {
-        "agnostic_nms": False,
-        "augment": True,
-        "classes": None,
-        "conf_thres": 0.25,
-        "device": "",
-        "exist_ok": False,
-        "img_size": 640,
-        "iou_thres": 0.45,
-        "name": "exp",
-        "view_img": False,
-        "no_trace": False,
-        "nosave": False,
-        "project": (
-            # 도커 환경 여부에 따라 로그 디렉토리 변경
-            "docker/runs/detect"
-            if os.environ.get("docker") == "True"
-            else "runs/detect"
-        ),
-        "save_conf": True,
-        "save_txt": True,
-        "update": False,
-        "weights": [YOLOV7_PT_FILE],
-    }
+# sys.path.insert(0, "./yolov5")
+# from app.yolov5_wrapper import v5Detector
+
+from app.voyager_metadata import (
+    YOLOV5_PT_FILE,
+    YOLOV7_DESC_PT_FILE,
+    YOLOV7_BASIC_PT_FILE,
 )
+
+
+def getOpt(pt_file=""):
+    opt = easydict.EasyDict(
+        {
+            "agnostic_nms": False,
+            "augment": True,
+            "classes": None,
+            "conf_thres": 0.25,
+            "device": "",
+            "exist_ok": False,
+            "img_size": 640,
+            "iou_thres": 0.45,
+            "name": "exp",
+            "view_img": False,
+            "no_trace": False,
+            "nosave": False,
+            "project": (
+                # 도커 환경 여부에 따라 로그 디렉토리 변경
+                "docker/runs/detect"
+                if os.environ.get("docker") == "True"
+                else "runs/detect"
+            ),
+            "save_conf": True,
+            "save_txt": True,
+            "update": False,
+            "weights": [pt_file],
+        }
+    )
+    return opt
+
+
+opt = getOpt()
 
 save_dir = Path(
     increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok)
@@ -51,11 +67,12 @@ save_dir = Path(
 app = FastAPI()
 stateMachine = StateMachine()
 tracker = TrackerWrapper()
-v7detector = v7Detector(opt, save_dir)
-v5detector = v5Detector(YOLOV5_PT_FILE, save_dir)
+Basicv7detector = v7Detector(getOpt(YOLOV7_BASIC_PT_FILE), save_dir)
+Descv7detector = v7Detector(getOpt(YOLOV7_DESC_PT_FILE), save_dir)
+# v5detector = v5Detector(YOLOV5_PT_FILE, save_dir)
 
 
-logger.info(f"Using models: {YOLOV5_PT_FILE}, {YOLOV7_PT_FILE}")
+logger.info(f"Using models: {YOLOV5_PT_FILE}, {YOLOV7_DESC_PT_FILE}")
 
 # 세션NO : detection result, 서비스 배포 시 여러장의 이미지를 한꺼번에 추론시키는 경우를 대비해 구축해놓았음.
 # 추후 메모리 누수 막기 위해 초기화시키는 알고리즘 필요
@@ -73,7 +90,7 @@ def bytes2cv(source: bytes, is_rot: bool):
     depth_cv = None
     if channel == 4:  # 4-channel image
         # Premultiplied Resolving
-        # RGBD = cv2.cvtColor(RGBD, cv2.COLOR_mRGBA2RGBA)
+        RGBD = cv2.cvtColor(RGBD, cv2.COLOR_mRGBA2RGBA)
         depth_cv = RGBD[:, :, 3]
         img_cv = RGBD[:, :, 0:3]
         img_cv = np.ascontiguousarray(img_cv, dtype=np.uint8)
@@ -119,7 +136,7 @@ async def file_upload(
     img_size = [rgb.shape[0], rgb.shape[1]]
 
     # YOLO 추론
-    result_dict[session_no] = v5detector.inference(
+    result_dict[session_no] = Basicv7detector.inference(
         source=rgb, im_id=session_no, save_name=log_str, depth_cv=None
     )
 
@@ -159,8 +176,8 @@ async def file_upload(
     }
 
 
-@app.post("/description")
-async def file_upload(
+@app.post("/inform")
+async def file_inform(
     source: bytes = File(...),
     session_no: int = Form(default=1, alias="sequenceNo"),
     is_rot: bool = Form(True),
@@ -181,7 +198,7 @@ async def file_upload(
     img_size = [rgb.shape[0], rgb.shape[1]]
 
     # YOLO 추론
-    result_dict[session_no] = v7detector.inference(
+    result_dict[session_no] = Descv7detector.inference(
         source=rgb, im_id=session_no, save_name=log_str, depth_cv=depth_cv
     )
 
@@ -213,6 +230,18 @@ async def file_upload(
     logger.info("/upload total runtime: {}", (time.time() - tick))
     logger.info(f"descrip_str: {descrip_str}, warning_str: {warning_str}")
 
+    log_dict = {
+        "is_depth": depth_cv is not None,
+        "rgb_shape": rgb.shape,
+        "yolo_objects": [box.__dict__ for box in result_dict[session_no].yolo],
+        "position": position.__dict__ if position else {},
+        "guide": guide_enum,
+        "description": descrip_str,
+        "warning": warning_str,
+    }
+
+    print(json.dumps(log_dict), flush=True)
+
     return {
         "guide": guide_enum,
         # "yolo": [obj.__dict__ for obj in guide_dict["yolo"]],
@@ -238,7 +267,7 @@ async def file_update(
 
     # YOLO 추론
     save_name = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{session_no}"
-    result_dict[session_no] = v7detector.inference(
+    result_dict[session_no] = Descv7detector.inference(
         rgb, session_no, save_name, depth_cv
     )  # 리턴타입은 {'yolo':list of bbox}, 바운딩박스 자료형은 딕셔너리
 
