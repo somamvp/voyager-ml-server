@@ -11,7 +11,7 @@ LOG_DIR=app/runs
 conda info | grep "active environment"
 
 if [ -z $1 ]; then 
-    PORT=8000
+    PORT=8001
 else 
     PORT=$1
 fi
