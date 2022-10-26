@@ -1,3 +1,4 @@
+import json
 import time, os
 
 import easydict, cv2
@@ -138,6 +139,18 @@ async def file_upload(
 
     logger.info("/upload total runtime: {}", (time.time() - tick))
     logger.info(f"descrip_str: {descrip_str}, warning_str: {warning_str}")
+
+    log_dict = {
+        "is_depth": depth_cv is not None,
+        "rgb_shape": rgb.shape,
+        "yolo_objects": [box.__dict__ for box in result_dict[session_no].yolo],
+        "position": position.__dict__ if position else {},
+        "guide": guide_enum,
+        "description": descrip_str,
+        "warning": warning_str,
+    }
+
+    print(json.dumps(log_dict), flush=True)
 
     return {
         "guide": guide_enum,
