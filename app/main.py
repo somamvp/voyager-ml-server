@@ -10,7 +10,7 @@ from loguru import logger
 import app.description as description
 from app.state_machine import Position, StateMachine
 from app.tracking import TrackerWrapper
-from app.yolov7_wrapper import Detector, DetectorInference
+from app.yolov7_wrapper import v7Detector, DetectorInference
 from app.voyager_metadata import YOLO_PT_FILE
 
 
@@ -44,7 +44,7 @@ opt = easydict.EasyDict(
 app = FastAPI()
 stateMachine = StateMachine()
 tracker = TrackerWrapper()
-detector = Detector(opt)
+v7detector = v7Detector(opt)
 
 # 세션NO : detection result, 서비스 배포 시 여러장의 이미지를 한꺼번에 추론시키는 경우를 대비해 구축해놓았음.
 # 추후 메모리 누수 막기 위해 초기화시키는 알고리즘 필요
@@ -108,7 +108,7 @@ async def file_upload(
     img_size = [rgb.shape[0], rgb.shape[1]]
 
     # YOLO 추론
-    result_dict[session_no] = detector.inference(
+    result_dict[session_no] = v7detector.inference(
         source=rgb, im_id=session_no, save_name=log_str, depth_cv=depth_cv
     )
 
@@ -121,7 +121,70 @@ async def file_upload(
         result_dict[session_no].yolo, validate_zebra_cross=(img_size[0] // 2)
     )
     tracker.save_result(
-        rgb, save_path=f"{detector.save_dir / log_str}_tracking.jpg"
+        rgb, save_path=f"{v7detector.save_dir / log_str}_tracking.jpg"
+    )
+
+    gps_infos = [gps_x, gps_y, gps_heading, gps_speed]
+    position = None if (None in gps_infos) else Position(*gps_infos)
+    stateMachine.newFrame(tracked_objects, position=position)
+    guide_enum = stateMachine.guides
+
+    logger.info("사용자 안내: {}", guide_enum)
+
+    # 전방 묘사
+    descrip_str, warning_str = description.inform(
+        depth_map=depth_cv,
+        yolo=result_dict[session_no].yolo,
+        img_size=img_size,
+        normal_range=4.0,
+    )
+
+    logger.info("/upload total runtime: {}", (time.time() - tick))
+    logger.info(f"descrip_str: {descrip_str}, warning_str: {warning_str}")
+
+    return {
+        "guide": guide_enum,
+        # "yolo": [obj.__dict__ for obj in guide_dict["yolo"]],
+        "yolo": descrip_str,
+        "warning": warning_str,
+    }
+
+@app.post("/description")
+async def file_upload(
+    source: bytes = File(...),
+    session_no: int = Form(default=1, alias="sequenceNo"),
+    is_rot: bool = Form(True),
+    gps_x: Optional[float] = Form(None, alias="gpsX"),
+    gps_y: Optional[float] = Form(None, alias="gpsY"),
+    gps_heading: Optional[float] = Form(None, alias="gpsHeading"),
+    gps_speed: Optional[float] = Form(None, alias="gpsSpeed"),
+):
+    # Pulse Acting
+    tick = time.time()
+    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{session_no}"
+
+    # 이미지 로딩
+    rgb, depth_cv = bytes2cv(source, is_rot)
+    logger.info(
+        f"SESSION: {session_no} - image recieved! size: {rgb.shape}, image conversion time: {time.time() - tick}"
+    )
+    img_size = [rgb.shape[0], rgb.shape[1]]
+
+    # YOLO 추론
+    result_dict[session_no] = v7detector.inference(
+        source=rgb, im_id=session_no, save_name=log_str, depth_cv=depth_cv
+    )
+
+    logger.info(
+        f"발견된 물체: {[box.name for box in result_dict[session_no].yolo]}, time: {time.time() - tick}",
+    )
+
+    # Tracking & State Machine
+    tracked_objects = tracker.update(
+        result_dict[session_no].yolo, validate_zebra_cross=(img_size[0] // 2)
+    )
+    tracker.save_result(
+        rgb, save_path=f"{v7detector.save_dir / log_str}_tracking.jpg"
     )
 
     gps_infos = [gps_x, gps_y, gps_heading, gps_speed]
@@ -150,6 +213,7 @@ async def file_upload(
     }
 
 
+
 @app.post("/update")
 async def file_update(
     source: bytes = File(...), session_no: int = 1, is_Rot=True
@@ -167,7 +231,7 @@ async def file_update(
 
     # YOLO 추론
     save_name = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{session_no}"
-    result_dict[session_no] = detector.inference(
+    result_dict[session_no] = v7detector.inference(
         rgb, session_no, save_name, depth_cv
     )  # 리턴타입은 {'yolo':list of bbox}, 바운딩박스 자료형은 딕셔너리
 

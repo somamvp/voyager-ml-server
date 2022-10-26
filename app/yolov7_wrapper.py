@@ -69,7 +69,7 @@ class DetectorInference:
         setattr(self, item, value)
 
 
-class Detector:
+class v7Detector:
     def __init__(self, opt={}):
         self.opt = opt
         self.weights, self.save_txt, self.imgsz, self.trace = (
