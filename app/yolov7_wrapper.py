@@ -2,7 +2,9 @@ import os, shutil
 from typing import List
 from pathlib import Path
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+
+from torch import cudnn_convolution_transpose
 
 from loguru import logger
 import cv2, torch
@@ -56,6 +58,12 @@ class DetectorObject:
 
     def bbox_coordinate_diagonal(self) -> List[float]:
         return [self.xmin, self.ymin, self.xmax, self.ymax]
+
+    @staticmethod
+    def from_dict(argDict: dict) -> "DetectorObject":
+        fieldSet = {f.name for f in fields(DetectorObject) if f.init}
+        filteredArgDict = {k: v for k, v in argDict.items() if k in fieldSet}
+        return DetectorObject(**filteredArgDict)
 
 
 @dataclass
