@@ -62,7 +62,7 @@ def bytes2cv(source: bytes, is_rot: bool):
     depth_cv = None
     if channel == 4:  # 4-channel image
         # Premultiplied Resolving
-        # RGBD = cv2.cvtColor(RGBD, cv2.COLOR_mRGBA2RGBA)
+        RGBD = cv2.cvtColor(RGBD, cv2.COLOR_mRGBA2RGBA)
         depth_cv = RGBD[:, :, 3]
         img_cv = RGBD[:, :, 0:3]
         img_cv = np.ascontiguousarray(img_cv, dtype=np.uint8)
