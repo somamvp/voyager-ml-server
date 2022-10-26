@@ -90,3 +90,32 @@ YOLO_THRES = {
     "movable_signage": 0.4,
     "bus_stop": 0.4,
 }
+YOLO_OBS_TYPE = {
+    "MOVING": [
+        "person",
+        "dog",
+        "car",
+        "bus",
+        "truck",
+        "motorcycle",
+        "bicycle",
+        "wheelchair",
+        "stroller",
+        "kickboard",
+    ],
+    "STATIC": [
+        "tree",
+        "bollard",
+        "labacon",
+        "bench",
+        "barricade",
+        "pot",
+        "table",
+        "chair",
+        "fire_hydrant",
+        "movable_signage",
+    ],
+    "BRAILLE": ["Braille_Block"],
+    "BUS_STOP": ["bus_stop"],
+    "OTHERS": ["Zebra_Cross", "R_Signal", "G_Signal", "manhole"],
+}

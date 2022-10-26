@@ -2,6 +2,8 @@
 tests/
 tracked/
 RGBD/
+!RGBD/*.py
+!RGBD/merged.webp
 
 # Trash can
 DELETE/

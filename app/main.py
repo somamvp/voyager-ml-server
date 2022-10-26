@@ -133,7 +133,10 @@ async def file_upload(
 
     # 전방 묘사
     descrip_str, warning_str = description.inform(
-        depth_map=depth_cv, yolo=result_dict[session_no].yolo, img_size=img_size
+        depth_map=depth_cv,
+        yolo=result_dict[session_no].yolo,
+        img_size=img_size,
+        normal_range=4.0,
     )
 
     logger.info("/upload total runtime: {}", (time.time() - tick))
@@ -141,10 +144,8 @@ async def file_upload(
 
     return {
         "guide": guide_enum,
-        # 정렬/솎아진 상태의 디텍션 정보
         # "yolo": [obj.__dict__ for obj in guide_dict["yolo"]],
         "yolo": descrip_str,
-        # Warning String
         "warning": warning_str,
     }
 
