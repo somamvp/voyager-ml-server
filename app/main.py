@@ -72,7 +72,9 @@ Descv7detector = v7Detector(getOpt(YOLOV7_DESC_PT_FILE), save_dir)
 # v5detector = v5Detector(YOLOV5_PT_FILE, save_dir)
 
 
-logger.info(f"Using models: {YOLOV5_PT_FILE}, {YOLOV7_DESC_PT_FILE}")
+logger.info(
+    f"Using models: basic-{YOLOV7_BASIC_PT_FILE}, desc-{YOLOV7_DESC_PT_FILE}"
+)
 
 # 세션NO : detection result, 서비스 배포 시 여러장의 이미지를 한꺼번에 추론시키는 경우를 대비해 구축해놓았음.
 # 추후 메모리 누수 막기 위해 초기화시키는 알고리즘 필요
@@ -126,7 +128,7 @@ async def file_upload(
 ):
     # High-frequency Acting
     tick = time.time()
-    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{session_no}"
+    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_uSession{session_no}"
 
     # 이미지 로딩
     rgb, depth_cv = bytes2cv(source, is_rot)
@@ -158,20 +160,34 @@ async def file_upload(
     logger.info("사용자 안내: {}", guide_enum)
 
     # 전방 묘사
+    # upload 에서는 지형묘사가 없고 box기반 Warning이 안되기 때문에 depth map만 전달함
     descrip_str, warning_str = description.inform(
         depth_map=depth_cv,
-        yolo=result_dict[session_no].yolo,
+        yolo=None,
         img_size=img_size,
         normal_range=4.0,
     )
 
     logger.info("/upload total runtime: {}", (time.time() - tick))
-    logger.info(f"descrip_str: {descrip_str}, warning_str: {warning_str}")
+    logger.info(
+        f"전방묘사 결과 - descrip_str: {descrip_str}, warning_str: {warning_str}"
+    )
+
+    log_dict = {
+        "is_depth": depth_cv is not None,
+        "rgb_shape": rgb.shape,
+        "yolo_objects": [box.__dict__ for box in result_dict[session_no].yolo],
+        "position": position.__dict__ if position else {},
+        "guide": "",
+        "description": descrip_str,
+        "warning": warning_str,
+    }
+
+    print(json.dumps(log_dict), flush=True)
 
     return {
         "guide": guide_enum,
-        # "yolo": [obj.__dict__ for obj in guide_dict["yolo"]],
-        "yolo": descrip_str,
+        "yolo": "",  # No description
         "warning": warning_str,
     }
 
@@ -186,9 +202,9 @@ async def file_inform(
     gps_heading: Optional[float] = Form(None, alias="gpsHeading"),
     gps_speed: Optional[float] = Form(None, alias="gpsSpeed"),
 ):
-    # Pulse Acting
+
     tick = time.time()
-    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{session_no}"
+    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_iSession{session_no}"
 
     # 이미지 로딩
     rgb, depth_cv = bytes2cv(source, is_rot)
@@ -214,10 +230,10 @@ async def file_inform(
 
     gps_infos = [gps_x, gps_y, gps_heading, gps_speed]
     position = None if (None in gps_infos) else Position(*gps_infos)
-    stateMachine.newFrame(tracked_objects, position=position)
-    guide_enum = stateMachine.guides
+    # stateMachine.newFrame(tracked_objects, position=position)
+    # guide_enum = stateMachine.guides
 
-    logger.info("사용자 안내: {}", guide_enum)
+    # logger.info("사용자 안내: {}", guide_enum)
 
     # 전방 묘사
     descrip_str, warning_str = description.inform(
@@ -228,14 +244,16 @@ async def file_inform(
     )
 
     logger.info("/upload total runtime: {}", (time.time() - tick))
-    logger.info(f"descrip_str: {descrip_str}, warning_str: {warning_str}")
+    logger.info(
+        f"전방묘사 결과 - descrip_str: {descrip_str}, warning_str: {warning_str}"
+    )
 
     log_dict = {
         "is_depth": depth_cv is not None,
         "rgb_shape": rgb.shape,
         "yolo_objects": [box.__dict__ for box in result_dict[session_no].yolo],
         "position": position.__dict__ if position else {},
-        "guide": guide_enum,
+        "guide": "",
         "description": descrip_str,
         "warning": warning_str,
     }
@@ -243,8 +261,7 @@ async def file_inform(
     print(json.dumps(log_dict), flush=True)
 
     return {
-        "guide": guide_enum,
-        # "yolo": [obj.__dict__ for obj in guide_dict["yolo"]],
+        "guide": "",  # No guide
         "yolo": descrip_str,
         "warning": warning_str,
     }
