@@ -163,7 +163,7 @@ async def file_upload(
     # upload 에서는 지형묘사가 없고 box기반 Warning이 안되기 때문에 depth map만 전달함
     descrip_str, warning_str = description.inform(
         depth_map=depth_cv,
-        yolo=None,
+        yolo=[],
         img_size=img_size,
         normal_range=4.0,
     )
@@ -261,7 +261,7 @@ async def file_inform(
     print(json.dumps(log_dict), flush=True)
 
     return {
-        "guide": "",  # No guide
+        "guide": [],  # No guide
         "yolo": descrip_str,
         "warning": warning_str,
     }

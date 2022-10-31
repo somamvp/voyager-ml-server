@@ -10,7 +10,8 @@ echo 'Asia/Seoul' > /etc/timezone
 date="$(date '+%y%m%d_%H:%M')"
 
 # 로그 파일 경로 설정
-LOG_DIR=app/docker
+#LOG_DIR=app/docker
+LOG_DIR=app/runs
 LOG_FILE=${LOG_DIR}/docker_${date}.log
 
 # FastAPI 빌드

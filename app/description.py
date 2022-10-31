@@ -1,12 +1,13 @@
 # Input ex) [{name:'R_Signal', xmin, xmax, ymin, ymax, conf:0.8, depth:200},{...}]
 from enum import Enum, IntEnum
+import numpy as np
 import math
 from typing import List
 from loguru import logger
 from app.voyager_metadata import YOLO_NAME_TO_KOREAN, YOLO_THRES, YOLO_OBS_TYPE
 from app.wrapper_essential import DetectorObject
 
-RANGE_TO_ALPHA = 255 / 20
+ALPHA_TO_RANGE = 20.0 / 255.0
 DEV_YOLO_BASED_WARNING = False
 
 
@@ -129,6 +130,11 @@ def inform(
 
     # Warning mesg by depth map
     else:
+        dist_map = (255 - depth_map) * ALPHA_TO_RANGE
+        print(
+            f"Dist map: {dist_map.shape} {np.min(dist_map)} ~ {np.max(dist_map)}"
+        )
+        np.savetxt("output.txt", dist_map, fmt="%1.3f")
         warning_msg = ""
 
     logger.info(
