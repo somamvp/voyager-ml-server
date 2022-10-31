@@ -116,9 +116,9 @@ class v7Detector:
     def inference(
         self, source, im_id, save_name: str, depth_cv=None
     ) -> DetectorInference:
-        if not save_name:
-            save_name = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{im_id}"
-        save_path = self.save_dir / save_name
+
+        # save_name 이 None이면 저장을 안함
+        save_path = self.save_dir / save_name if save_name is not None else None
 
         if type(source) is str:
             dataset = LoadImages(
@@ -167,6 +167,7 @@ class v7Detector:
                 # Write results
                 for obj in reversed(det):
                     *coor, conf, cls = obj.tolist()
+                    xc = (coor[0] + coor[2]) / 2
 
                     depth = -1
                     if depth_cv is not None:
@@ -190,6 +191,7 @@ class v7Detector:
 
                     box = DetectorObject(
                         *coor,
+                        xc=xc,
                         confidence=round(float(conf), 5),
                         cls=int(cls),
                         name=self.names[int(cls)],
@@ -198,10 +200,11 @@ class v7Detector:
                     boxes.append(box)
 
                     # Save text
-                    with open(f"{save_path}.txt", "a") as f:
-                        f.write(
-                            f"{box.cls}\t {box.name:>18s} {str(coor):>30s}\t {box.confidence:.05f}\t {depth}\n"
-                        )
+                    if save_path is not None:
+                        with open(f"{save_path}.txt", "a") as f:
+                            f.write(
+                                f"{box.cls}\t {box.name:>18s} {str(coor):>30s}\t {box.confidence:.05f}\t {depth}\n"
+                            )
 
                     # Save image
                     label = f"{self.names[int(cls)]} {conf:.2f}"
@@ -216,10 +219,13 @@ class v7Detector:
             results = DetectorInference(yolo=boxes)
 
             # Save results
-            cv2.imwrite(f"{save_path}.jpg", img_orig)
-            cv2.imwrite(f"{save_path}_detection.jpg", img_save)
-            if depth_cv is not None:
-                cv2.imwrite(f"{self.save_dir / save_name}_depth.jpg", depth_cv)
+            if save_name is not None:
+                cv2.imwrite(f"{save_path}.jpg", img_orig)
+                cv2.imwrite(f"{save_path}_detection.jpg", img_save)
+                if depth_cv is not None:
+                    cv2.imwrite(
+                        f"{self.save_dir / save_name}_depth.jpg", depth_cv
+                    )
 
             return results
 

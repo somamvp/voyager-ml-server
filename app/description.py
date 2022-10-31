@@ -12,9 +12,9 @@ DEV_YOLO_BASED_WARNING = False
 
 
 class ReadPriority(Enum):
-    LEFT_TO_RIGHT = 1
-    RIGHT_TO_LEFT = 2
-    NEAR_TO_FAR = 3
+    LEFT_TO_RIGHT = 0
+    RIGHT_TO_LEFT = 1
+    NEAR_TO_FAR = 2
 
 
 class ReadObstacle(IntEnum):
@@ -27,21 +27,132 @@ class ReadObstacle(IntEnum):
     OTHERS = 0b10000
 
 
-# 이전 호출에서 입력받은 값을 기억하려고 하는데, 이렇게 그냥 전역변수로 써도 되나?
-prev_target_obs_num: int = int(ReadObstacle.MOVING) + int(ReadObstacle.BRAILLE)
-target_obs = [
-    "person",
-    "dog",
-    "car",
-    "bus",
-    "truck",
-    "motorcycle",
-    "bicycle",
-    "wheelchair",
-    "stroller",
-    "kickboard",
-    "Braille_Block",
-]
+class Direction(IntEnum):
+    NONE = 0
+    RIGHT = 1
+    CENTER = 2
+    LEFT = 4
+
+
+obstacle_on_crosswalk = ["car", "bus", "truck", "motorcycle", "bollard"]
+
+# Scene 문제점 : 너무 많은 객체 읽게 되는 경우
+# Depth  픽셀값0~255 : 거리0~20 : 실제사용0~7
+
+
+class ClockCycleStateActivator:
+    # 한 세션 안에서 환경설정은 일정하다고 가정
+    def __init__(self, basetime: float, settings, img_size=[640, 480]):
+        self.scene_target_number: int = settings["scene_type"]
+        self.target_obs: List[str] = update_target_obs(self.scene_target_number)
+        self.priority: int = settings["mode"]
+        self.scene_range: float = settings["scene_range"]
+        self.warning_range: float = settings["warning_range"]
+        self.braille_period: float = settings["braiile_period"]
+        self.scene_period: float = settings["scene_period"]
+        self.img_size = img_size
+
+        self.yolo = None
+        self.depth_map = None
+        self.time = basetime
+
+        # 직전 안내 시간
+        self.last_scene: float = basetime
+        self.last_braille: float = basetime
+
+        # 직전 안내 State
+        self.prev_braille: int = 0
+        self.prev_cross: int = 0
+        self.curr_braille: int = 0
+        self.curr_cross: int = 0
+
+    def timer_reset(self, time: float):
+        self.time = time
+        self.last_scene = time
+        self.last_braille = time
+
+    def direct(self, xc) -> int:
+        if xc > self.img_size[1] * 0.25 and xc < self.img_size[1] * 0.75:
+            return Direction.CENTER
+        elif xc < self.img_size[1] * 0.25:
+            return Direction.LEFT
+        else:
+            return Direction.RIGHT
+
+    def update(self, time: float, yolo: List[DetectorObject], depth_map=None):
+        self.yolo = yolo
+        self.depth_map = depth_map
+        self.time = time
+
+        self.prev_braille = self.curr_braille
+        self.prev_cross = self.curr_cross
+
+        direction_list = []
+        for el in self.yolo:
+            if el["name"] == "Braille_Block":
+                direction_list.append(self.direct(el["xc"]))
+        direction_set = set(direction_list)
+        self.curr_braille = 0
+        for num in direction_set:
+            self.curr_braille += num
+
+        sorted_yolo = sorted(self.yolo, key=lambda x: x["ymax"], reverse=True)
+        cross = None
+        for el in sorted_yolo:
+            if el["name"] == "Zebra_Cross":
+                cross = el
+                break
+        self.curr_cross = (
+            Direction.NONE if cross is None else self.direct(cross["xc"])
+        )
+
+    def inform_near(self) -> str:
+        if self.depth_map is None:
+            return ""
+        else:
+            pass
+
+    def inform_on_cross(self) -> str:
+        pass
+
+    def inform_waiting_light(self) -> str:
+        pass
+
+    def inform_regular(self) -> str:
+
+        if () or (self.time - self.last_braille > self.braille_period):
+            return self.msg_braille()
+
+        elif self.time - self.last_scene > self.scene_period:
+            return self.msg_scene()
+
+    def msg_braille(self):
+        self.last_braille = self.time
+        return ""
+
+    def msg_scene(self):
+        self.last_scene = self.time
+        guide_list = []
+        for el in self.yolo:
+            if el.name not in self.target_obs:
+                continue
+            if el.confidence < YOLO_THRES[el.name]:
+                continue
+            if el["depth"] < self.normal_range:  # 라이다가 없으면 물체를 전부 다 읽음
+                guide_list.append(el)
+
+        if self.priority == ReadPriority.LEFT_TO_RIGHT:
+            sorted_obj = sorted(
+                guide_list, key=lambda x: x["xc"], reverse=False
+            )
+        elif self.priority == ReadPriority.RIGHT_TO_LEFT:
+            sorted_obj = sorted(guide_list, key=lambda x: x["xc"], reverse=True)
+        elif self.priority == ReadPriority.NEAR_TO_FAR:
+            sorted_obj = sorted(
+                guide_list, key=lambda x: x["depth"], reverse=False
+            )
+
+        return obj2str(sorted_obj)
 
 
 def obj2str(yolo: List[DetectorObject], warning: bool = False):
@@ -53,8 +164,8 @@ def obj2str(yolo: List[DetectorObject], warning: bool = False):
     return msg
 
 
-def update_target_obstacle(target_obs_num):
-    target_obs.clear()
+def update_target_obs(target_obs_num):
+    target_obs = []
     if target_obs_num & 1:
         for el in YOLO_OBS_TYPE["MOVING"]:
             target_obs.append(el)
@@ -70,56 +181,10 @@ def update_target_obstacle(target_obs_num):
     if target_obs_num & 16:
         for el in YOLO_OBS_TYPE["OTHERS"]:
             target_obs.append(el)
+    return target_obs
 
 
-# 예상되는 문제1 너무 많은 객체 읽게 되는 경우
-# 예상되는 문제2 적절한 depth range값을 찾기 어려움
-
-
-# Depth  픽셀값0~255 : 거리0~20 : 실제사용0~7
-def inform(
-    depth_map,
-    yolo: List[DetectorObject],
-    priority: int = ReadPriority.LEFT_TO_RIGHT,
-    target_obs_num: int = int(ReadObstacle.MOVING) + int(ReadObstacle.BRAILLE),
-    normal_range: float = 4.0,
-    warning_range: float = 2.0,
-    img_size=[480, 640],
-):
-
-    if target_obs_num != prev_target_obs_num:
-        update_target_obstacle(target_obs_num)
-
-    guide_list = []
-    for el in yolo:
-        if el.name not in target_obs:
-            continue
-        if el.confidence < YOLO_THRES[el.name]:
-            continue
-        el["xc"] = (el["xmin"] + el["xmax"]) / 2
-        el["yc"] = (el["ymin"] + el["ymax"]) / 2
-        if (
-            el["depth"]
-            < normal_range
-            # and abs(
-            #     math.atan2(
-            #         img_size[1] - el["ymax"], el["xc"] - (img_size[0] / 2)
-            #     )
-            # )
-            # < math.pi / 4
-        ):
-            guide_list.append(el)
-
-    if priority == ReadPriority.LEFT_TO_RIGHT:
-        sorted_obj = sorted(guide_list, key=lambda x: x["xc"], reverse=False)
-    elif priority == ReadPriority.RIGHT_TO_LEFT:
-        sorted_obj = sorted(guide_list, key=lambda x: x["xc"], reverse=True)
-    elif priority == ReadPriority.NEAR_TO_FAR:
-        sorted_obj = sorted(guide_list, key=lambda x: x["depth"], reverse=False)
-    else:
-        logger.info("Description mode selected incorrectly")
-    user_trigger_msg = obj2str(sorted_obj)
-
+def temp():
     # Warning mesg generating based on YOLO
     if DEV_YOLO_BASED_WARNING:
         warning_obj = []
@@ -131,9 +196,6 @@ def inform(
     # Warning mesg by depth map
     else:
         dist_map = (255 - depth_map) * ALPHA_TO_RANGE
-        print(
-            f"Dist map: {dist_map.shape} {np.min(dist_map)} ~ {np.max(dist_map)}"
-        )
         np.savetxt("output.txt", dist_map, fmt="%1.3f")
         warning_msg = ""
 

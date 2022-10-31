@@ -1,4 +1,4 @@
-import json, sys
+import json
 import time, os
 import app.description as description
 import easydict, cv2
@@ -13,19 +13,19 @@ from pathlib import Path
 
 from app.state_machine import Position, StateMachine
 from app.tracking import TrackerWrapper
-from app.wrapper_essential import DetectorInference, DetectorObject
+from app.wrapper_essential import (
+    DetectorInference,
+    DetectorObject,
+    increment_path,
+    IoU,
+)
+from app.description import ClockCycleStateActivator
 from app.yolov7_wrapper import v7Detector
-from app.wrapper_essential import increment_path
-
-# sys.path.pop()
-
-# sys.path.insert(0, "./yolov5")
-# from app.yolov5_wrapper import v5Detector
-
 from app.voyager_metadata import (
-    YOLOV5_PT_FILE,
+    # YOLOV5_PT_FILE,
     YOLOV7_DESC_PT_FILE,
     YOLOV7_BASIC_PT_FILE,
+    YOLO_NAME_TO_KOREAN,
 )
 
 
@@ -67,10 +67,9 @@ save_dir = Path(
 app = FastAPI()
 stateMachine = StateMachine()
 tracker = TrackerWrapper()
-Basicv7detector = v7Detector(getOpt(YOLOV7_BASIC_PT_FILE), save_dir)
-Descv7detector = v7Detector(getOpt(YOLOV7_DESC_PT_FILE), save_dir)
-# v5detector = v5Detector(YOLOV5_PT_FILE, save_dir)
-
+Basicv7detector, Descv7detector = v7Detector(
+    getOpt(YOLOV7_BASIC_PT_FILE), save_dir
+), v7Detector(getOpt(YOLOV7_DESC_PT_FILE), save_dir)
 
 logger.info(
     f"Using models: basic-{YOLOV7_BASIC_PT_FILE}, desc-{YOLOV7_DESC_PT_FILE}"
@@ -79,6 +78,8 @@ logger.info(
 # 세션NO : detection result, 서비스 배포 시 여러장의 이미지를 한꺼번에 추론시키는 경우를 대비해 구축해놓았음.
 # 추후 메모리 누수 막기 위해 초기화시키는 알고리즘 필요
 result_dict: Dict[int, DetectorInference] = {}
+desc_dict: Dict[int, DetectorInference] = {}
+clock_state: Dict[int, ClockCycleStateActivator] = {}
 
 
 def bytes2cv(source: bytes, is_rot: bool):
@@ -96,6 +97,15 @@ def bytes2cv(source: bytes, is_rot: bool):
         depth_cv = RGBD[:, :, 3]
         img_cv = RGBD[:, :, 0:3]
         img_cv = np.ascontiguousarray(img_cv, dtype=np.uint8)
+
+        # Depth map side pixel error resolve
+        for i in range(3):
+            for j in range(depth_cv.shape[1]):
+                depth_cv[i][j] = depth_cv[3][j]
+        for j in range(2):
+            for i in range(depth_cv.shape[0]):
+                depth_cv[i][-1 - j] = depth_cv[i][-3]
+
         logger.info(
             f"Depth integrated image recieved, depth value max: {depth_cv.max()}, min: {depth_cv.min()}"  # noqa : E501
         )
@@ -121,13 +131,13 @@ async def file_upload(
     source: bytes = File(...),
     session_no: int = Form(default=1, alias="sequenceNo"),
     is_rot: bool = Form(True),
-    gps_x: Optional[float] = Form(None, alias="gpsX"),
-    gps_y: Optional[float] = Form(None, alias="gpsY"),
-    gps_heading: Optional[float] = Form(None, alias="gpsHeading"),
-    gps_speed: Optional[float] = Form(None, alias="gpsSpeed"),
+    gps_info: str = Form("{}", alias="gpsInfo"),
+    settings: str = Form(...),
 ):
     # High-frequency Acting
     tick = time.time()
+    if session_no not in clock_state.keys():
+        clock_state[session_no] = ClockCycleStateActivator(tick)
     log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_uSession{session_no}"
 
     # 이미지 로딩
@@ -139,11 +149,17 @@ async def file_upload(
 
     # YOLO 추론
     result_dict[session_no] = Basicv7detector.inference(
-        source=rgb, im_id=session_no, save_name=log_str, depth_cv=None
+        source=rgb, im_id=session_no, save_name=log_str, depth_cv=depth_cv
+    )
+    logger.info(
+        f"발견된 물체(횡단보도 안내): {[box.name for box in result_dict[session_no].yolo]}, time: {time.time() - tick}"
     )
 
+    desc_dict[session_no] = Descv7detector.inference(
+        source=rgb, im_id=session_no, save_name=None, depth_cv=depth_cv
+    )
     logger.info(
-        f"발견된 물체(횡단보도 안내): {[box.name for box in result_dict[session_no].yolo]}, time: {time.time() - tick}",
+        f"발견된 물체(전체): {[box.name for box in desc_dict[session_no].yolo]}, time: {time.time() - tick}"
     )
 
     # Tracking & State Machine
@@ -152,154 +168,124 @@ async def file_upload(
     )
     tracker.save_result(rgb, save_path=f"{save_dir / log_str}_tracking.jpg")
 
-    gps_infos = [gps_x, gps_y, gps_heading, gps_speed]
-    position = None if (None in gps_infos) else Position(*gps_infos)
+    position = None
+    gps = json.loads(gps_info)
+    if {"x", "y", "heading", "speed"}.issubset(gps):
+        position = Position(gps["x"], gps["y"], gps["heading"], gps["speed"])
     stateMachine.newFrame(tracked_objects, position=position)
     guide_enum = stateMachine.guides
 
-    logger.info("사용자 안내: {}", guide_enum)
+    # 안내 생성
+    CS = clock_state[session_no]
+    CS.update(time.time(), desc_dict[session_no].yolo, depth_cv)
+    msg = CS.inform_near()
 
-    # 전방 묘사
-    # upload 에서는 지형묘사가 없고 box기반 Warning이 안되기 때문에 depth map만 전달함
-    descrip_str, warning_str = description.inform(
-        depth_map=depth_cv,
-        yolo=[],
-        img_size=img_size,
-        normal_range=4.0,
-    )
+    if msg != "":
+        pass
+    elif stateMachine.is_now_crossing:
+        msg += CS.inform_on_cross()
+        CS.timer_reset(time.time())
+    elif stateMachine.is_guiding_crossroad:
+        msg += CS.inform_waiting_light()
+    else:
+        msg += CS.inform_regular()
 
+    # 로깅
     logger.info("/upload total runtime: {}", (time.time() - tick))
-    logger.info(
-        f"전방묘사 결과 - descrip_str: {descrip_str}, warning_str: {warning_str}"
-    )
-
+    logger.info("횡단보도 안내: {}", guide_enum)
+    logger.info("일반 안내: {}", descrip_str)
     log_dict = {
         "is_depth": depth_cv is not None,
         "rgb_shape": rgb.shape,
         "yolo_objects": [box.__dict__ for box in result_dict[session_no].yolo],
         "position": position.__dict__ if position else {},
-        "guide": "",
+        "guide": guide_enum,
         "description": descrip_str,
-        "warning": warning_str,
     }
-
     print(json.dumps(log_dict), flush=True)
 
     return {
         "guide": guide_enum,
-        "yolo": "",  # No description
-        "warning": warning_str,
+        "yolo": "",  # 이제 이거 바꿔야됨
+        "warning": descrip_str,
     }
 
 
-@app.post("/inform")
-async def file_inform(
-    source: bytes = File(...),
-    session_no: int = Form(default=1, alias="sequenceNo"),
-    is_rot: bool = Form(True),
-    gps_x: Optional[float] = Form(None, alias="gpsX"),
-    gps_y: Optional[float] = Form(None, alias="gpsY"),
-    gps_heading: Optional[float] = Form(None, alias="gpsHeading"),
-    gps_speed: Optional[float] = Form(None, alias="gpsSpeed"),
-):
+# @app.post("/inform")
+# async def file_inform(
+#     source: bytes = File(...),
+#     session_no: int = Form(default=1, alias="sequenceNo"),
+#     is_rot: bool = Form(True),
+#     gps_info: str = Form("{}", alias="gpsInfo"),
+#     settings: str = Form(...),
+# ):
 
-    tick = time.time()
-    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_iSession{session_no}"
+#     settings = json.loads(settings)
 
-    # 이미지 로딩
-    rgb, depth_cv = bytes2cv(source, is_rot)
-    logger.info(
-        f"SESSION: {session_no} - image recieved! size: {rgb.shape}, image conversion time: {time.time() - tick}"
-    )
-    img_size = [rgb.shape[0], rgb.shape[1]]
+#     tick = time.time()
+#     log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_iSession{session_no}"
 
-    # YOLO 추론
-    result_dict[session_no] = Descv7detector.inference(
-        source=rgb, im_id=session_no, save_name=log_str, depth_cv=depth_cv
-    )
+#     # 이미지 로딩
+#     rgb, depth_cv = bytes2cv(source, is_rot)
+#     logger.info(
+#         f"SESSION: {session_no} - image recieved! size: {rgb.shape}, image conversion time: {time.time() - tick}"
+#     )
+#     img_size = [rgb.shape[0], rgb.shape[1]]
 
-    logger.info(
-        f"발견된 물체: {[box.name for box in result_dict[session_no].yolo]}, time: {time.time() - tick}",
-    )
+#     # YOLO 추론
+#     result_dict[session_no] = Descv7detector.inference(
+#         source=rgb, im_id=session_no, save_name=log_str, depth_cv=depth_cv
+#     )
 
-    # Tracking & State Machine
-    tracked_objects = tracker.update(
-        result_dict[session_no].yolo, validate_zebra_cross=(img_size[0] // 2)
-    )
-    tracker.save_result(rgb, save_path=f"{save_dir / log_str}_tracking.jpg")
+#     logger.info(
+#         f"발견된 물체: {[box.name for box in result_dict[session_no].yolo]}, time: {time.time() - tick}",
+#     )
 
-    gps_infos = [gps_x, gps_y, gps_heading, gps_speed]
-    position = None if (None in gps_infos) else Position(*gps_infos)
-    # stateMachine.newFrame(tracked_objects, position=position)
-    # guide_enum = stateMachine.guides
+#     # Tracking & State Machine
+#     # tracked_objects = tracker.update(
+#     #     result_dict[session_no].yolo, validate_zebra_cross=(img_size[0] // 2)
+#     # )
+#     # tracker.save_result(rgb, save_path=f"{save_dir / log_str}_tracking.jpg")
 
-    # logger.info("사용자 안내: {}", guide_enum)
+#     position = None
+#     gps = json.loads(gps_info)
+#     if {"x", "y", "heading", "speed"}.issubset(gps):
+#         position = Position(gps["x"], gps["y"], gps["heading"], gps["speed"])
+#     # stateMachine.newFrame(tracked_objects, position=position)
+#     # guide_enum = stateMachine.guides
 
-    # 전방 묘사
-    descrip_str, warning_str = description.inform(
-        depth_map=depth_cv,
-        yolo=result_dict[session_no].yolo,
-        img_size=img_size,
-        normal_range=4.0,
-    )
+#     # logger.info("사용자 안내: {}", guide_enum)
 
-    logger.info("/upload total runtime: {}", (time.time() - tick))
-    logger.info(
-        f"전방묘사 결과 - descrip_str: {descrip_str}, warning_str: {warning_str}"
-    )
+#     # 전방 묘사
+#     descrip_str, warning_str = description.inform(
+#         depth_map=depth_cv,
+#         yolo=result_dict[session_no].yolo,
+#         img_size=img_size,
+#         normal_range=4.0,
+#     )
 
-    log_dict = {
-        "is_depth": depth_cv is not None,
-        "rgb_shape": rgb.shape,
-        "yolo_objects": [box.__dict__ for box in result_dict[session_no].yolo],
-        "position": position.__dict__ if position else {},
-        "guide": "",
-        "description": descrip_str,
-        "warning": warning_str,
-    }
+#     logger.info("/upload total runtime: {}", (time.time() - tick))
+#     logger.info(
+#         f"전방묘사 결과 - descrip_str: {descrip_str}, warning_str: {warning_str}"
+#     )
 
-    print(json.dumps(log_dict), flush=True)
+#     log_dict = {
+#         "is_depth": depth_cv is not None,
+#         "rgb_shape": rgb.shape,
+#         "yolo_objects": [box.__dict__ for box in result_dict[session_no].yolo],
+#         "position": position.__dict__ if position else {},
+#         "guide": "",
+#         "description": descrip_str,
+#         "warning": warning_str,
+#     }
 
-    return {
-        "guide": [],  # No guide
-        "yolo": descrip_str,
-        "warning": warning_str,
-    }
+#     print(json.dumps(log_dict), flush=True)
 
-
-@app.post("/update")
-async def file_update(
-    source: bytes = File(...), session_no: int = 1, is_Rot=True
-):
-    # Low-frequency Acting
-    tick = time.time()
-    high_freq = False
-
-    # 이미지 로딩
-    rgb, depth_cv = bytes2cv(is_Rot, source)
-    logger.info(
-        f"image recieved! size: {rgb.size}, image conversion time: {time.time() - tick}"
-    )
-    img_size = [rgb.shape[0], rgb.shape[1]]
-
-    # YOLO 추론
-    save_name = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{session_no}"
-    result_dict[session_no] = Descv7detector.inference(
-        rgb, session_no, save_name, depth_cv
-    )  # 리턴타입은 {'yolo':list of bbox}, 바운딩박스 자료형은 딕셔너리
-
-    logger.info(f"Inference Done. ({time.time()- tick:.3f}s)")
-    logger.info("세션 아이디: {}", session_no)
-    logger.info(
-        "발견된 물체: {}",
-        [result["name"] for result in result_dict[session_no].yolo],
-    )
-    guide_dict = description.inform(
-        result_dict[session_no].yolo, img_size=img_size
-    )
-
-    logger.info("/update total runtime: {}", (time.time() - tick))
-    return {"high_freq": high_freq, "yolo": guide_dict}  # 정렬/솎아진 상태의 디텍션 정보
+#     return {
+#         "guide": [],  # No guide
+#         "yolo": descrip_str,
+#         "warning": warning_str,
+#     }
 
 
 @app.get("/start")
