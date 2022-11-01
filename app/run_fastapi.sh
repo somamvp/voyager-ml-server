@@ -1,5 +1,5 @@
 #!/bin/zsh
-
+PORT=8002 # ws:8001, dk:8001, jw:8002
 BASEDIR=$(dirname "$0")
 cd $BASEDIR/../
 
@@ -10,20 +10,15 @@ LOG_DIR=app/runs
 # source activate yolov7-env
 conda info | grep "active environment"
 
-if [ -z $1 ]; then 
-    PORT=8001
-else 
-    PORT=$1
-fi
-
 CURRENT_PID=$(pgrep -f "port $PORT")
+
 echo process info: ${CURRENT_PID}
 
 if [ -z "$CURRENT_PID" ]; then
     echo "> 현재 구동 중인 애플리케이션이 없으므로 종료하지 않습니다."
 else
     echo "> 기존에 구동 중인 서버를 종료합니다."
-    kill -15 $CURRENT_PID
+    kill -9 $(lsof -t -i:${PORT})
     sleep 1
 fi
 
