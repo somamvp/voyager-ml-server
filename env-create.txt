@@ -1,0 +1,1 @@
+conda create -n test pip python=3.9 --no-default-packages

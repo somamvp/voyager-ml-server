@@ -1,9 +1,3 @@
-# local testing files
-tests/
-tracked/
-RGBD/
-!RGBD/*.py
-!RGBD/merged.webp
 
 # Trash can
 DELETE/
@@ -11,12 +5,23 @@ DELETE/
 # Data files
 *.mp4
 *.MOV
-*.jpg
 *.gif
+*.zip
 *.png
+*.jpg
+*.jpeg
+*.webp
 
 # Nohup log files
 *.out
+
+# local testing files
+tests/
+tracked/
+RGBD/*
+!RGBD/*.py
+!RGBD/merged.webp
+app/output.txt
 
 # YOLO files
 runs/
@@ -151,8 +156,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-*.png
-*.jpg
-*.jpeg
 *.pem
-*.webp
