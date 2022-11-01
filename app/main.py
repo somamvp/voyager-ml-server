@@ -136,8 +136,16 @@ async def file_upload(
 ):
     # High-frequency Acting
     tick = time.time()
+    settings = {
+        "scene_type": 1,
+        "mode": 1,
+        "scene_range": 4.0,
+        "warning_range": 1.35,
+        "braille_period": 15,
+        "scene_period": 30,
+    }
     if session_no not in clock_state.keys():
-        clock_state[session_no] = ClockCycleStateActivator(tick)
+        clock_state[session_no] = ClockCycleStateActivator(tick, settings)
     log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_uSession{session_no}"
 
     # 이미지 로딩
@@ -189,6 +197,8 @@ async def file_upload(
         msg += CS.inform_waiting_light()
     else:
         msg += CS.inform_regular()
+
+    descrip_str = msg
 
     # 로깅
     logger.info("/upload total runtime: {}", (time.time() - tick))

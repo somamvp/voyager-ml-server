@@ -11,7 +11,7 @@ ALPHA_TO_RANGE = 20.0 / 255.0
 DEV_YOLO_BASED_WARNING = False
 
 
-class ReadPriority(Enum):
+class ReadPriority(IntEnum):
     LEFT_TO_RIGHT = 0
     RIGHT_TO_LEFT = 1
     NEAR_TO_FAR = 2
@@ -79,9 +79,13 @@ class ClockCycleStateActivator:
         else:
             return Direction.RIGHT
 
-    def update(self, time: float, yolo: List[DetectorObject], depth_map=None):
+    def update(self, time: float, yolo: List[DetectorObject], depth_cv=None):
         self.yolo = yolo
-        self.depth_map = depth_map
+        self.depth_map = (
+            None if depth_cv is None else (255 - depth_cv) * ALPHA_TO_RANGE
+        )
+        if depth_cv is not None:
+            np.savetxt("output.txt", self.depth_map, fmt="%1.3f")
         self.time = time
 
         self.prev_braille = self.curr_braille
@@ -106,11 +110,30 @@ class ClockCycleStateActivator:
             Direction.NONE if cross is None else self.direct(cross["xc"])
         )
 
+    def delay(self, delay: float = 0.5):
+        self.last_scene += delay
+        self.last_braille += delay
+
     def inform_near(self) -> str:
         if self.depth_map is None:
             return ""
-        else:
-            pass
+
+        h = self.img_size[0]
+        w = self.img_size[1]
+        exp = 0
+        for zone in [
+            [0, int(w / 4)],
+            [int(w / 4), int(3 * w / 4)],
+            [int(3 * w / 4), w],
+        ]:
+            cnt = 0
+            exp += 1
+            for x in range(zone[0], zone[1]):
+                for y in range(int(h * 0.05), int(h * 0.5)):
+                    if self.depth_map[x][y] < self.warning_range:
+                        cnt += 1
+            if cnt > 50:
+                pass
 
     def inform_on_cross(self) -> str:
         pass
@@ -119,8 +142,9 @@ class ClockCycleStateActivator:
         pass
 
     def inform_regular(self) -> str:
-
-        if () or (self.time - self.last_braille > self.braille_period):
+        if (self.prev_braille != self.curr_braille) or (
+            self.time - self.last_braille > self.braille_period
+        ):
             return self.msg_braille()
 
         elif self.time - self.last_scene > self.scene_period:
@@ -128,7 +152,7 @@ class ClockCycleStateActivator:
 
     def msg_braille(self):
         self.last_braille = self.time
-        return ""
+        return "점자블록 " + dir2str(self.curr_braille, self.priority)
 
     def msg_scene(self):
         self.last_scene = self.time
@@ -161,6 +185,26 @@ def obj2str(yolo: List[DetectorObject], warning: bool = False):
         korean_name = YOLO_NAME_TO_KOREAN[el["name"]]
         append = korean_name + " 충돌주의 " if warning else "" + korean_name + " "
         msg = msg + append
+    return msg
+
+
+def dir2str(direction: int, priority=ReadPriority.LEFT_TO_RIGHT):
+    if direction == 0:
+        return ""
+
+    msg_list: List[str] = []
+    if direction >= 4:
+        msg_list.append("좌측")
+    if (direction % 4) >= 2:
+        msg_list.append("정면")
+    if (direction % 2) >= 1:
+        msg_list.append("우측")
+
+    if priority == ReadPriority.RIGHT_TO_LEFT:
+        msg_list.reverse()
+    msg = ""
+    for el in msg_list:
+        msg += f" {el}"
     return msg
 
 
