@@ -117,7 +117,7 @@ YOLO_OBS_TYPE = {
         "fire_hydrant",
         "movable_signage",
     ],
-    "BRAILLE": ["Braille_Block"],
+    "FLOOR": ["Zebra_Cross", "Braille_Block", "manhole"],
     "BUS_STOP": ["bus_stop"],
-    "OTHERS": ["Zebra_Cross", "R_Signal", "G_Signal", "manhole"],
+    "LIGHTS": ["R_Signal", "G_Signal"],
 }
