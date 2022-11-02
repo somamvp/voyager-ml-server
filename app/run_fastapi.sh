@@ -1,5 +1,5 @@
 #!/bin/zsh
-PORT=8001
+PORT=8002
 BASEDIR=$(dirname "$0")
 cd $BASEDIR/../
 
