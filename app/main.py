@@ -67,6 +67,16 @@ save_dir = Path(
 app = FastAPI()
 stateMachine = StateMachine()
 tracker = TrackerWrapper()
+
+settings = {
+    "scene_type": 3,
+    "mode": 1,
+    "scene_range": 6.0,
+    "warning_range": 1.2,
+    "braille_period": 15,
+    "scene_period": 30,
+}
+clockcyclestateactivator = ClockCycleStateActivator(settings, time.time())
 Basicv7detector, Descv7detector = v7Detector(
     getOpt(YOLOV7_BASIC_PT_FILE), save_dir
 ), v7Detector(getOpt(YOLOV7_DESC_PT_FILE), save_dir)
@@ -74,12 +84,13 @@ Basicv7detector, Descv7detector = v7Detector(
 logger.info(
     f"Using models: basic-{YOLOV7_BASIC_PT_FILE}, desc-{YOLOV7_DESC_PT_FILE}"
 )
+logger.info(f"Using settings: {settings}")
 
 # 세션NO : detection result, 서비스 배포 시 여러장의 이미지를 한꺼번에 추론시키는 경우를 대비해 구축해놓았음.
 # 추후 메모리 누수 막기 위해 초기화시키는 알고리즘 필요
 result_dict: Dict[int, DetectorInference] = {}
 desc_dict: Dict[int, DetectorInference] = {}
-clock_state: Dict[int, ClockCycleStateActivator] = {}
+# clock_state: Dict[int, ClockCycleStateActivator] = {}
 
 
 def bytes2cv(source: bytes, is_rot: bool):
@@ -136,24 +147,19 @@ async def file_upload(
 ):
     # High-frequency Acting
     tick = time.time()
-    settings = {
-        "scene_type": 1,
-        "mode": 1,
-        "scene_range": 4.0,
-        "warning_range": 1.35,
-        "braille_period": 15,
-        "scene_period": 30,
-    }
-    if session_no not in clock_state.keys():
-        clock_state[session_no] = ClockCycleStateActivator(tick, settings)
-    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_uSession{session_no}"
+    global clockcyclestateactivator
+    # clockcyclestateactivator.set(settings)
+    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{session_no}"
 
     # 이미지 로딩
     rgb, depth_cv = bytes2cv(source, is_rot)
+    img_size = [rgb.shape[0], rgb.shape[1]]
+    cv2.imwrite(f"{save_dir / log_str}.jpg", rgb)
+    if depth_cv is not None:
+        cv2.imwrite(f"{save_dir / log_str}_depth.jpg", depth_cv)
     logger.info(
         f"SESSION: {session_no} - image recieved! size: {rgb.shape}, image conversion time: {time.time() - tick}"
     )
-    img_size = [rgb.shape[0], rgb.shape[1]]
 
     # YOLO 추론
     result_dict[session_no] = Basicv7detector.inference(
@@ -164,7 +170,10 @@ async def file_upload(
     )
 
     desc_dict[session_no] = Descv7detector.inference(
-        source=rgb, im_id=session_no, save_name=None, depth_cv=depth_cv
+        source=rgb,
+        im_id=session_no,
+        save_name=log_str + "_d",
+        depth_cv=depth_cv,
     )
     logger.info(
         f"발견된 물체(전체): {[box.name for box in desc_dict[session_no].yolo]}, time: {time.time() - tick}"
@@ -182,28 +191,24 @@ async def file_upload(
         position = Position(gps["x"], gps["y"], gps["heading"], gps["speed"])
     stateMachine.newFrame(tracked_objects, position=position)
     guide_enum = stateMachine.guides
+    logger.info(f"트래킹, 스테이트머신 처리: time: {time.time() - tick}")
 
     # 안내 생성
-    CS = clock_state[session_no]
-    CS.update(time.time(), desc_dict[session_no].yolo, depth_cv)
-    msg = CS.inform_near()
-
-    if msg != "":
-        pass
-    elif stateMachine.is_now_crossing:
-        msg += CS.inform_on_cross()
-        CS.timer_reset(time.time())
-    elif stateMachine.is_guiding_crossroad:
-        msg += CS.inform_waiting_light()
-    else:
-        msg += CS.inform_regular()
-
-    descrip_str = msg
+    descrip_str, yolo_str = clockcyclestateactivator.inform(
+        time.time(),
+        desc_dict[session_no].yolo,
+        stateMachine.is_now_crossing,
+        stateMachine.is_guiding_crossroad,
+        depth_cv,
+    )
+    logger.info(
+        f"안내 생성됨. 횡단보도 안내: {guide_enum}, 일반 안내: {descrip_str}, time: {time.time() - tick}"
+    )
 
     # 로깅
     logger.info("/upload total runtime: {}", (time.time() - tick))
-    logger.info("횡단보도 안내: {}", guide_enum)
-    logger.info("일반 안내: {}", descrip_str)
+    # logger.info("횡단보도 안내: {}", guide_enum)
+    # logger.info("일반 안내: {}", descrip_str)
     log_dict = {
         "is_depth": depth_cv is not None,
         "rgb_shape": rgb.shape,

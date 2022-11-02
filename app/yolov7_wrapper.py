@@ -168,6 +168,7 @@ class v7Detector:
                 for obj in reversed(det):
                     *coor, conf, cls = obj.tolist()
                     xc = (coor[0] + coor[2]) / 2
+                    h = coor[3] - coor[1]
 
                     depth = -1
                     if depth_cv is not None:
@@ -192,6 +193,7 @@ class v7Detector:
                     box = DetectorObject(
                         *coor,
                         xc=xc,
+                        h=h,
                         confidence=round(float(conf), 5),
                         cls=int(cls),
                         name=self.names[int(cls)],
@@ -220,12 +222,7 @@ class v7Detector:
 
             # Save results
             if save_name is not None:
-                cv2.imwrite(f"{save_path}.jpg", img_orig)
                 cv2.imwrite(f"{save_path}_detection.jpg", img_save)
-                if depth_cv is not None:
-                    cv2.imwrite(
-                        f"{self.save_dir / save_name}_depth.jpg", depth_cv
-                    )
 
             return results
 
