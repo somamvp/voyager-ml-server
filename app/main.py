@@ -3,6 +3,7 @@ import time, os
 import app.description as description
 import easydict, cv2
 import numpy as np
+import pickle
 
 from typing import Dict, Optional
 from datetime import datetime
@@ -185,11 +186,20 @@ async def file_upload(
 
     print(json.dumps(log_dict), flush=True)
 
-    return {
+    redis_objects = {
+        "state_machine": str(pickle.dumps(stateMachine)),
+        "tracker": str(pickle.dumps(tracker)),
+        "clock_activator": "",
+    }
+    result = [x for x in range(2)]
+    result[0] = {
+        "logdict": log_dict,
         "guide": guide_enum,
         "yolo": "",  # No description
         "warning": warning_str,
     }
+    result[1] = {"redis": json.dumps(redis_objects)}
+    return result
 
 
 @app.post("/inform")
