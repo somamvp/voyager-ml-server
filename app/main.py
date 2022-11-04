@@ -28,6 +28,8 @@ from app.voyager_metadata import (
     YOLOV7_BASIC_PT_FILE,
     YOLO_NAME_TO_KOREAN,
 )
+from app.state_redis import rd
+from app.state_saver import StateSaver
 
 
 def getOpt(pt_file=""):
@@ -133,6 +135,19 @@ async def root():
     return {"message": "Hello World"}
 
 
+@app.get("/create")
+async def create():
+    # create csl
+
+    state_machine = StateMachine(should_light_exist=None)
+    tracker = TrackerWrapper()
+    cs = ClockCycleStateActivator({}, time.time())
+
+    redis_objects = StateSaver(state_machine, tracker, cs)
+
+    return {"redis": redis_objects.stringify()}
+
+
 @app.get("/test")
 async def test():
     return {"message": "test"}
@@ -146,6 +161,33 @@ async def file_upload(
     gps_info: str = Form("{}", alias="gpsInfo"),
     settings: str = Form(...),
 ):
+
+    logger.info(f"session_id {session_id}; cross_start {cross_start}")
+
+    if session_id is None:
+        global stateMachine, tracker, clockcyclestateactivator
+
+    if cross_start:
+        logger.info(
+            f"--------restarting state machine & tracker: light {should_light_exist}----------"
+        )
+        stateMachine = StateMachine(should_light_exist=should_light_exist)
+        tracker = TrackerWrapper()
+    elif session_id is not None:
+        # 세션 아이디를 기반으로 레디스에 저장한 이전 값을 불러옴
+        key = f"state:{session_id}"
+
+        # redis에 저장된 값 파싱해서 쓰면 됌.
+        # ex)"{'redis':{"state_machine": "b\\"\\\\x80\\\\x04\\\\x95X\\\\x01\\\\x00\\\\x00\\...}"
+        data = rd.hget(key, "stateResult")
+        string = json.loads(data)["redis"]
+
+        state_saver = StateSaver.unstringify(string)
+
+        stateMachine = state_saver.state_machine
+        tracker = state_saver.tracker
+        clockcyclestateactivator = state_saver.clock_activator
+
     # High-frequency Acting
     tick = time.time()
     global clockcyclestateactivator
@@ -218,21 +260,17 @@ async def file_upload(
         "guide": guide_enum,
         "description": descrip_str,
     }
-    print(json.dumps(log_dict), flush=True)
 
-    redis_objects = {
-        "state_machine": str(pickle.dumps(stateMachine)),
-        "tracker": str(pickle.dumps(tracker)),
-        "clock_activator": "",
-    }
-    result = [x for x in range(2)]
+    redis_objects = StateSaver(stateMachine, tracker, clockcyclestateactivator)
+    result = [*range(3)]
     result[0] = {
-        "logdict": log_dict,
         "guide": guide_enum,
         "yolo": "",  # 이제 이거 바꿔야됨
         "warning": descrip_str,
     }
-    result[1] = {"redis": json.dumps(redis_objects)}
+    result[1] = {"logdict": log_dict}
+    result[2] = {"redis": redis_objects.stringify()}
+
     return result
 
 
