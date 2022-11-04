@@ -9,13 +9,11 @@ from app.description import ClockCycleStateActivator
 
 
 def pickle_string_2_obj(string: str):
-    return pickle.loads(
-        string.encode("utf-8", "unicode_escape").replace(b"\xc2", b"")
-    )
+    return pickle.loads(string.encode("latin-1"))
 
 
 def obj_2_pickle_string(obj: Any):
-    return pickle.dumps(obj).decode("unicode_escape")
+    return pickle.dumps(obj).decode("latin-1")
 
 
 @dataclass
