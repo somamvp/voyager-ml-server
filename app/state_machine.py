@@ -7,6 +7,7 @@ from loguru import logger
 from easydict import EasyDict
 
 from app.wrapper_essential import DetectorObject
+from app.description import Direction, dir2str
 
 YOLO_CLASS_NAMES = {"R_Signal": "Red", "G_Signal": "Green"}
 
@@ -54,9 +55,11 @@ class Position:
 class StateMachine:
 
     is_now_crossing = False
-    is_guiding_crossroad = False
-    last_trafficlight = TrafficLight.Red
-    current_trafficlight = TrafficLight.Red
+    crossroad_state = False
+    last_trafficlight = TrafficLight.NotFound
+    current_trafficlight = TrafficLight.NotFound
+
+    frame_data: List[DetectorObject] = []
 
     guides: List[str] = []
 
@@ -72,7 +75,7 @@ class StateMachine:
     def green(self):
         return self._green > 0
 
-    def __init__(self, should_light_exist=True, use_gps=True):
+    def __init__(self, should_light_exist: Optional[bool] = None, use_gps=True):
         self.should_light_exist = should_light_exist
         self.cross_not_disappear_if_position_similar = use_gps
         self.position: Position = None
@@ -86,6 +89,8 @@ class StateMachine:
         frame_data: List[DetectorObject],
         position: Optional[Position] = None,
     ):
+        frame_data = sorted(frame_data, key=lambda x: x["ymax"], reverse=True)
+        self.frame_data = frame_data
         self.guides = []
 
         if self.position is None:
@@ -130,70 +135,104 @@ class StateMachine:
         self.process_state()
 
     def process_state(self):
-        if self.should_light_exist is None:  # 신호등 정보가 없는 횡단보도
+        # if self.should_light_exist is None:  # 신호등 정보가 없는 횡단보도
+
+        #     if self.cross and (self.red or self.green):  # 횡단보도, 신호등 모두 있을 때
+        #         self.should_light_exist = True
+        #         self.crossroad_state = False
+
+        #         self.current_trafficlight = (
+        #             TrafficLight.Red if self.red else TrafficLight.Green
+        #         )
+
+        #         if not self.crossroad_state:
+        #             self.start_guiding_crossroad()
+        #         elif self.current_trafficlight != self.last_trafficlight:
+        #             self.on_trafficlight_changed()
+
+        #     elif self.cross and not (self.red or self.green):  # 횡단보도만 있을 때
+        #         self.current_trafficlight = TrafficLight.Notsure
+        #         # self.crossroad_state = True
+
+        #         if not self.crossroad_state:
+        #             self.start_guiding_crossroad()
+        #         elif self.current_trafficlight != self.last_trafficlight:
+        #             self.on_trafficlight_changed()
+
+        #     elif not self.cross:  # 횡단보도 하나도 없을 때
+
+        #         if self.crossroad_state:
+        #             self.on_end_crossroad()
+        #             self.crossroad_state = False
+
+        #     self.last_trafficlight = self.current_trafficlight
+
+        if self.should_light_exist or (self.should_light_exist is None):  # 신있횡
 
             if self.cross and (self.red or self.green):  # 횡단보도, 신호등 모두 있을 때
-                self.should_light_exist = True
-                self.is_guiding_crossroad = False
+
+                if self.should_light_exist is None:
+                    self.should_light_exist = True
 
                 self.current_trafficlight = (
                     TrafficLight.Red if self.red else TrafficLight.Green
                 )
 
-                if not self.is_guiding_crossroad:
+                if not self.crossroad_state:
                     self.start_guiding_crossroad()
                 elif self.current_trafficlight != self.last_trafficlight:
                     self.on_trafficlight_changed()
 
             elif self.cross and not (self.red or self.green):  # 횡단보도만 있을 때
-                self.current_trafficlight = TrafficLight.Notsure
-                self.is_guiding_crossroad = True
+                self.current_trafficlight = (
+                    TrafficLight.NotFound
+                    if self.should_light_exist
+                    else TrafficLight.Notsure
+                )
 
-                if not self.is_guiding_crossroad:
+                if not self.crossroad_state:
                     self.start_guiding_crossroad()
                 elif self.current_trafficlight != self.last_trafficlight:
                     self.on_trafficlight_changed()
 
             elif not self.cross:  # 횡단보도 하나도 없을 때
 
-                if self.is_guiding_crossroad:
-                    self.on_end_crossroad()
-                    self.is_guiding_crossroad = False
-
-            self.last_trafficlight = self.current_trafficlight
-
-        elif self.should_light_exist:  # 신있횡
-
-            if self.cross and (self.red or self.green):  # 횡단보도, 신호등 모두 있을 때
-                self.current_trafficlight = (
-                    TrafficLight.Red if self.red else TrafficLight.Green
-                )
-
-                if not self.is_guiding_crossroad:
-                    self.start_guiding_crossroad()
-                elif self.current_trafficlight != self.last_trafficlight:
-                    self.on_trafficlight_changed()
-
-            elif self.cross and not (self.red or self.green):  # 횡단보도만 있을 때
-                self.current_trafficlight = TrafficLight.NotFound
-
-                if not self.is_guiding_crossroad:
-                    self.start_guiding_crossroad()
-                elif self.current_trafficlight != self.last_trafficlight:
-                    self.on_trafficlight_changed()
-
-            elif not self.cross:  # 횡단보도 하나도 없을 때
-
-                if self.is_guiding_crossroad:
+                if self.crossroad_state:
                     self.on_end_crossroad()
 
             self.last_trafficlight = self.current_trafficlight
 
         elif not self.should_light_exist:  # 신없횡
-            if self.cross and not self.is_guiding_crossroad:
+            if self.cross and not self.crossroad_state:
                 self.start_guiding_crossroad()
-            elif not self.cross and self.is_guiding_crossroad:
+            elif not self.cross and self.crossroad_state:
                 self.on_end_crossroad()
+
+        if self.crossroad_state:
+            self.guide_crossroad_change()
+
+    def guide_crossroad_change(self):
+        curr_direction = self.get_crossroad_direction()
+        if curr_direction > 0 and curr_direction != self.crossroad_state:
+            self.crossroad_state = curr_direction
+
+            self.guide(f"횡단보도 {dir2str(self.crossroad_state)}.")
+
+    def get_crossroad_direction(self) -> Direction:
+        for box in self.frame_data:
+            if box.name == "Zebra_Cross":
+                xc = getattr(box, "xc", -1)
+                width = 480
+                direction = Direction.NONE
+
+                if 0 <= xc < width * 0.33:
+                    direction = Direction.LEFT
+                elif width * 0.33 <= xc < width * 0.66:
+                    direction = Direction.CENTER
+                elif xc > width * 0.66:
+                    direction = Direction.RIGHT
+
+                return direction
 
     def detect_class_cases(
         self,
@@ -229,10 +268,10 @@ class StateMachine:
         return isDetected
 
     def start_guiding_crossroad(self, initial_mention=True):
-        self.is_guiding_crossroad = True
-        if not self.should_light_exist:
+        self.crossroad_state = True
+        if self.should_light_exist == False:
             self.guide("무신호 횡단보도 감지됨.")
-            self.is_guiding_crossroad = True
+            self.crossroad_state = True
             return
 
         self.last_trafficlight = self.current_trafficlight
@@ -240,26 +279,36 @@ class StateMachine:
         if initial_mention:
             self.guide("횡단보도 감지됨.")
 
+        crossroad_direction = self.get_crossroad_direction()
+        if crossroad_direction > 0:
+            self.crossroad_state = crossroad_direction
+
+            if self.crossroad_state in [Direction.LEFT, Direction.RIGHT]:
+                self.guide(f"{dir2str(self.crossroad_state)}.")
+
         if self.current_trafficlight == TrafficLight.Red:
             self.guide("빨간불입니다.")
         elif self.current_trafficlight == TrafficLight.Green:
             self.guide("초록불입니다.")
-        elif self.current_trafficlight == TrafficLight.NotFound:
-            self.guide("신호등 인식 불가! 시야를 움직여 주세요.")
+        else:
+            self.guide("시야를 움직여 신호등을 탐색하세요.")
 
     def on_end_crossroad(self):
-        self.is_guiding_crossroad = False
+        self.crossroad_state = False
         self.guide("횡단보도가 시야에서 사라졌습니다.")
 
     def on_trafficlight_changed(self):
 
-        if self.last_trafficlight == TrafficLight.NotFound:
+        if self.last_trafficlight in [
+            TrafficLight.NotFound,
+            TrafficLight.Notsure,
+        ]:
             self.guide("신호등 정상 인식.")
             self.start_guiding_crossroad(initial_mention=False)
         else:
             if self.current_trafficlight == TrafficLight.Red:
                 self.guide("신호가 빨간불로 바뀌었습니다.")
-                self.is_guiding_crossroad = False
+                self.crossroad_state = False
             elif self.current_trafficlight == TrafficLight.Green:
                 self.guide("신호가 초록불로 바뀌었습니다.")
                 self.is_now_crossing = True

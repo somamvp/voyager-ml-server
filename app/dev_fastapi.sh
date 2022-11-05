@@ -26,7 +26,7 @@ fi
 
 LOG_FILE=${LOG_DIR}/fast_${PORT}_${date}.log
 
-nohup uvicorn app.main:app --reload --host 0.0.0.0 --port $PORT > $LOG_FILE 2>&1 &
+uvicorn app.main:app --reload --host 0.0.0.0 --port $PORT > $LOG_FILE 2>&1 &
 
 tail -F $LOG_FILE
 

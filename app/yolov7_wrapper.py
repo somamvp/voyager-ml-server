@@ -114,7 +114,7 @@ class v7Detector:
         return self.save_dir
 
     def inference(
-        self, source, im_id, save_name: str, depth_cv=None
+        self, source, im_id, save_name: str, depth_map=None
     ) -> DetectorInference:
 
         # save_name 이 None이면 저장을 안함
@@ -150,7 +150,7 @@ class v7Detector:
             )
             t2 = time_synchronized()
 
-            logger.info(f"Inference Done. ({t2 - t1:.3f}s)")
+            # logger.info(f"Inference Done. ({t2 - t1:.3f}s)")
 
             for det in pred:  # detections per image, (n, 6)
 
@@ -171,8 +171,8 @@ class v7Detector:
                     h = coor[3] - coor[1]
 
                     depth = -1
-                    if depth_cv is not None:
-                        scale = 3  # 클수록 광범위, 2 이상이어야 함
+                    if depth_map is not None:
+                        scale = 3  # 클수록 좁은범위, 2 이상이어야 함
                         cutout_w = (coor[2] - coor[0]) / scale
                         cutout_h = (coor[3] - coor[1]) / scale
                         w_start, w_end = (
@@ -185,10 +185,8 @@ class v7Detector:
                         )
 
                         # (y,x) 순서임에 주의
-                        hitbox = depth_cv[h_start:h_end, w_start:w_end]
-                        depth = round(
-                            (255 - np.mean(hitbox)) * ALPHA_TO_RANGE, 4
-                        )
+                        hitbox = depth_map[h_start:h_end, w_start:w_end]
+                        depth = round(np.mean(hitbox), 4)
 
                     box = DetectorObject(
                         *coor,
@@ -205,7 +203,7 @@ class v7Detector:
                     if save_path is not None:
                         with open(f"{save_path}.txt", "a") as f:
                             f.write(
-                                f"{box.cls}\t {box.name:>18s} {str(coor):>30s}\t {box.confidence:.05f}\t {depth}\n"
+                                f"{box.cls}\t {box.name:>15s} {str(coor):>30s}\t   {box.confidence:.05f}\t\t {depth}\t   {box.h}\n"
                             )
 
                     # Save image

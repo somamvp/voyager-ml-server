@@ -1,6 +1,7 @@
 YOLOV5_PT_FILE = "basicv5.pt"
 YOLOV7_BASIC_PT_FILE = "wesee7_6.pt"
 YOLOV7_DESC_PT_FILE = "extended_4.pt"
+ALPHA_TO_RANGE = 20.0 / 255.0
 YOLO_IDX_TO_NAME = [
     "Zebra_Cross",
     "R_Signal",
@@ -64,33 +65,33 @@ YOLO_IDX_TO_KOREAN = {
     idx: korean for idx, korean in enumerate(list(YOLO_NAME_TO_KOREAN.values()))
 }
 YOLO_THRES = {
-    "Zebra_Cross": 0.6,
-    "R_Signal": 0.4,
-    "G_Signal": 0.4,
+    "Zebra_Cross": 0.5,
+    "R_Signal": 0.3,
+    "G_Signal": 0.3,
     "Braille_Block": 0.4,
     "person": 0.5,
     "dog": 0.4,
     "tree": 0.35,
     "car": 0.5,
     "bus": 0.4,
-    "truck": 0.4,
+    "truck": 0.3,
     "motorcycle": 0.35,
     "bicycle": 0.35,
     "none": 1,
-    "wheelchair": 0.3,
-    "stroller": 0.3,
-    "kickboard": 0.3,
-    "bollard": 0.4,
-    "manhole": 0.5,
-    "labacon": 0.45,
-    "bench": 0.4,
-    "barricade": 0.4,
-    "pot": 0.35,
-    "table": 0.35,
-    "chair": 0.35,
+    "wheelchair": 0.25,
+    "stroller": 0.25,
+    "kickboard": 0.25,
+    "bollard": 0.25,
+    "manhole": 0.4,
+    "labacon": 0.3,
+    "bench": 0.25,
+    "barricade": 0.25,
+    "pot": 0.25,
+    "table": 0.25,
+    "chair": 0.25,
     "fire_hydrant": 0.4,
-    "movable_signage": 0.4,
-    "bus_stop": 0.4,
+    "movable_signage": 0.3,
+    "bus_stop": 0.3,
 }
 YOLO_OBS_TYPE = {
     "MOVING": [
@@ -117,7 +118,6 @@ YOLO_OBS_TYPE = {
         "fire_hydrant",
         "movable_signage",
     ],
-    "FLOOR": ["Zebra_Cross", "Braille_Block", "manhole"],
+    "FLOOR": ["manhole"],
     "BUS_STOP": ["bus_stop"],
-    "LIGHTS": ["R_Signal", "G_Signal"],
 }
