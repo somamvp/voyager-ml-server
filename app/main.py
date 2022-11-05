@@ -156,10 +156,12 @@ async def test():
 @app.post("/upload")
 async def file_upload(
     source: bytes = File(...),
-    session_no: int = Form(default=1, alias="sequenceNo"),
+    sequence_no: int = Form(1),
+    session_id: Optional[str] = Form(None),
     is_rot: bool = Form(True),
-    gps_info: str = Form("{}", alias="gpsInfo"),
-    settings: str = Form(...),
+    gps_info: str = Form("{}"),
+    cross_start: bool = Form(False),
+    should_light_exist: Optional[bool] = Form(None),
 ):
 
     logger.info(f"session_id {session_id}; cross_start {cross_start}")
@@ -190,9 +192,7 @@ async def file_upload(
 
     # High-frequency Acting
     tick = time.time()
-    global clockcyclestateactivator
-    # clockcyclestateactivator.set(settings)
-    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{session_no}"
+    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_{session_id[:5]}_{sequence_no}"
 
     # 이미지 로딩
     rgb, depth_cv = bytes2cv(source, is_rot)
@@ -201,30 +201,31 @@ async def file_upload(
     if depth_cv is not None:
         cv2.imwrite(f"{save_dir / log_str}_depth.jpg", depth_cv)
     logger.info(
-        f"SESSION: {session_no} - image recieved! size: {rgb.shape}, image conversion time: {time.time() - tick}"
+        f"SESSION: {sequence_no} - image recieved! size: {rgb.shape}, image conversion time: {time.time() - tick}"
     )
 
     # YOLO 추론
-    result_dict[session_no] = Basicv7detector.inference(
-        source=rgb, im_id=session_no, save_name=log_str, depth_cv=depth_cv
+    result_dict[session_id] = Basicv7detector.inference(
+        source=rgb, im_id=session_id, save_name=log_str, depth_cv=depth_cv
     )
     logger.info(
-        f"발견된 물체(횡단보도 안내): {[box.name for box in result_dict[session_no].yolo]}, time: {time.time() - tick}"
+        f"발견된 물체(횡단보도 안내): {[box.name for box in result_dict[session_id].yolo]}, time: {time.time() - tick}"
     )
 
-    desc_dict[session_no] = Descv7detector.inference(
+    desc_dict[session_id] = Descv7detector.inference(
         source=rgb,
-        im_id=session_no,
+        im_id=session_id,
         save_name=log_str + "_d",
         depth_cv=depth_cv,
     )
     logger.info(
-        f"발견된 물체(전체): {[box.name for box in desc_dict[session_no].yolo]}, time: {time.time() - tick}"
+        f"발견된 물체(전체): {[box.name for box in desc_dict[session_id].yolo]}, time: {time.time() - tick}"
     )
 
     # Tracking & State Machine
     tracked_objects = tracker.update(
-        result_dict[session_no].yolo, validate_zebra_cross=(img_size[0] // 2)
+        result_dict[session_id].yolo,
+        validate_zebra_cross=(img_size[0] // 2),
     )
     tracker.save_result(rgb, save_path=f"{save_dir / log_str}_tracking.jpg")
 
@@ -239,7 +240,7 @@ async def file_upload(
     # 안내 생성
     descrip_str, yolo_str = clockcyclestateactivator.inform(
         time.time(),
-        desc_dict[session_no].yolo,
+        desc_dict[session_id].yolo,
         stateMachine.is_now_crossing,
         stateMachine.is_guiding_crossroad,
         depth_cv,
@@ -250,12 +251,11 @@ async def file_upload(
 
     # 로깅
     logger.info("/upload total runtime: {}", (time.time() - tick))
-    # logger.info("횡단보도 안내: {}", guide_enum)
-    # logger.info("일반 안내: {}", descrip_str)
+
     log_dict = {
         "is_depth": depth_cv is not None,
         "rgb_shape": rgb.shape,
-        "yolo_objects": [box.__dict__ for box in result_dict[session_no].yolo],
+        "yolo_objects": [box.__dict__ for box in result_dict[session_id].yolo],
         "position": position.__dict__ if position else {},
         "guide": guide_enum,
         "description": descrip_str,
@@ -272,83 +272,6 @@ async def file_upload(
     result[2] = {"redis": redis_objects.stringify()}
 
     return result
-
-
-# @app.post("/inform")
-# async def file_inform(
-#     source: bytes = File(...),
-#     session_no: int = Form(default=1, alias="sequenceNo"),
-#     is_rot: bool = Form(True),
-#     gps_info: str = Form("{}", alias="gpsInfo"),
-#     settings: str = Form(...),
-# ):
-
-#     settings = json.loads(settings)
-
-#     tick = time.time()
-#     log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_iSession{session_no}"
-
-#     # 이미지 로딩
-#     rgb, depth_cv = bytes2cv(source, is_rot)
-#     logger.info(
-#         f"SESSION: {session_no} - image recieved! size: {rgb.shape}, image conversion time: {time.time() - tick}"
-#     )
-#     img_size = [rgb.shape[0], rgb.shape[1]]
-
-#     # YOLO 추론
-#     result_dict[session_no] = Descv7detector.inference(
-#         source=rgb, im_id=session_no, save_name=log_str, depth_cv=depth_cv
-#     )
-
-#     logger.info(
-#         f"발견된 물체: {[box.name for box in result_dict[session_no].yolo]}, time: {time.time() - tick}",
-#     )
-
-#     # Tracking & State Machine
-#     # tracked_objects = tracker.update(
-#     #     result_dict[session_no].yolo, validate_zebra_cross=(img_size[0] // 2)
-#     # )
-#     # tracker.save_result(rgb, save_path=f"{save_dir / log_str}_tracking.jpg")
-
-#     position = None
-#     gps = json.loads(gps_info)
-#     if {"x", "y", "heading", "speed"}.issubset(gps):
-#         position = Position(gps["x"], gps["y"], gps["heading"], gps["speed"])
-#     # stateMachine.newFrame(tracked_objects, position=position)
-#     # guide_enum = stateMachine.guides
-
-#     # logger.info("사용자 안내: {}", guide_enum)
-
-#     # 전방 묘사
-#     descrip_str, warning_str = description.inform(
-#         depth_map=depth_cv,
-#         yolo=result_dict[session_no].yolo,
-#         img_size=img_size,
-#         normal_range=4.0,
-#     )
-
-#     logger.info("/upload total runtime: {}", (time.time() - tick))
-#     logger.info(
-#         f"전방묘사 결과 - descrip_str: {descrip_str}, warning_str: {warning_str}"
-#     )
-
-#     log_dict = {
-#         "is_depth": depth_cv is not None,
-#         "rgb_shape": rgb.shape,
-#         "yolo_objects": [box.__dict__ for box in result_dict[session_no].yolo],
-#         "position": position.__dict__ if position else {},
-#         "guide": "",
-#         "description": descrip_str,
-#         "warning": warning_str,
-#     }
-
-#     print(json.dumps(log_dict), flush=True)
-
-#     return {
-#         "guide": [],  # No guide
-#         "yolo": descrip_str,
-#         "warning": warning_str,
-#     }
 
 
 @app.get("/start")
