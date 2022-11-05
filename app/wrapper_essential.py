@@ -16,7 +16,7 @@ class DetectorObject:
     xmax: float
     ymax: float
     xc: float
-    h: float
+    h: int
 
     confidence: float
     cls: int
