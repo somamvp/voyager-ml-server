@@ -12,6 +12,9 @@ DELETE/
 *.jpeg
 *.webp
 
+# Run files
+*.sh
+
 # Nohup log files
 *.out
 
