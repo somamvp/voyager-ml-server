@@ -68,14 +68,18 @@ opt = getOpt()
 #     increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok)
 # )  # increment run
 save_dir = Path(
-    increment_path(Path(opt.project) / (f"{datetime.now().strftime('%y%m%d_')}" + opt.name), exist_ok=False)
+    increment_path(
+        Path(opt.project)
+        / (f"{datetime.now().strftime('%y%m%d_')}" + opt.name),
+        exist_ok=False,
+    )
 )
 app = FastAPI()
 stateMachine = StateMachine()
 tracker = TrackerWrapper()
 
 settings = {
-    "scene_type": 2, # 0 ~ 15사이 정수
+    "scene_type": 2,  # 0 ~ 15사이 정수
     "mode": 0,  # 0 또는 1
     "scene_range": 6.0,
 }
@@ -255,7 +259,9 @@ async def file_upload(
         depth_map is not None,
         position,
     )
-    logger.info(f"횡단보도 안내: {guide_enum}, 위험안내: {warning_str}, 위험수준: {direction_warning_level}")
+    logger.info(
+        f"횡단보도 안내: {guide_enum}, 위험안내: {warning_str}, 위험수준: {direction_warning_level}"
+    )
     logger.info(f"전방묘사 버튼: {descrip_str}, 점자블록 버튼: {braille_str}")
 
     # 로깅
