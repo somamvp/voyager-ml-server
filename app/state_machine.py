@@ -7,7 +7,8 @@ from loguru import logger
 from easydict import EasyDict
 
 from app.wrapper_essential import DetectorObject
-from app.description import Direction, dir2str
+
+# from app.description import Direction, dir2str
 
 YOLO_CLASS_NAMES = {"R_Signal": "Red", "G_Signal": "Green"}
 
@@ -208,31 +209,31 @@ class StateMachine:
             elif not self.cross and self.crossroad_state:
                 self.on_end_crossroad()
 
-        if self.crossroad_state:
-            self.guide_crossroad_change()
+        # if self.crossroad_state:
+        #     self.guide_crossroad_change()
 
-    def guide_crossroad_change(self):
-        curr_direction = self.get_crossroad_direction()
-        if curr_direction > 0 and curr_direction != self.crossroad_state:
-            self.crossroad_state = curr_direction
+    # def guide_crossroad_change(self):
+    #     curr_direction = self.get_crossroad_direction()
+    #     if curr_direction > 0 and curr_direction != self.crossroad_state:
+    #         self.crossroad_state = curr_direction
 
-            self.guide(f"횡단보도 {dir2str(self.crossroad_state)}.")
+    #         self.guide(f"횡단보도 {dir2str(self.crossroad_state)}.")
 
-    def get_crossroad_direction(self) -> Direction:
-        for box in self.frame_data:
-            if box.name == "Zebra_Cross":
-                xc = getattr(box, "xc", -1)
-                width = 480
-                direction = Direction.NONE
+    # def get_crossroad_direction(self) -> Direction:
+    #     for box in self.frame_data:
+    #         if box.name == "Zebra_Cross":
+    #             xc = getattr(box, "xc", -1)
+    #             width = 480
+    #             direction = Direction.NONE
 
-                if 0 <= xc < width * 0.33:
-                    direction = Direction.LEFT
-                elif width * 0.33 <= xc < width * 0.66:
-                    direction = Direction.CENTER
-                elif xc > width * 0.66:
-                    direction = Direction.RIGHT
+    #             if 0 <= xc < width * 0.33:
+    #                 direction = Direction.LEFT
+    #             elif width * 0.33 <= xc < width * 0.66:
+    #                 direction = Direction.CENTER
+    #             elif xc > width * 0.66:
+    #                 direction = Direction.RIGHT
 
-                return direction
+    #             return direction
 
     def detect_class_cases(
         self,
@@ -279,12 +280,12 @@ class StateMachine:
         if initial_mention:
             self.guide("횡단보도 감지됨.")
 
-        crossroad_direction = self.get_crossroad_direction()
-        if crossroad_direction > 0:
-            self.crossroad_state = crossroad_direction
+        # crossroad_direction = self.get_crossroad_direction()
+        # if crossroad_direction > 0:
+        #     self.crossroad_state = crossroad_direction
 
-            if self.crossroad_state in [Direction.LEFT, Direction.RIGHT]:
-                self.guide(f"{dir2str(self.crossroad_state)}.")
+        #     if self.crossroad_state in [Direction.LEFT, Direction.RIGHT]:
+        #         self.guide(f"{dir2str(self.crossroad_state)}.")
 
         if self.current_trafficlight == TrafficLight.Red:
             self.guide("빨간불입니다.")
