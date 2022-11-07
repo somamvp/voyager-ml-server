@@ -4,18 +4,18 @@ import numpy as np
 import time
 from typing import List
 from loguru import logger
-from app.voyager_metadata import YOLO_NAME_TO_KOREAN, YOLO_THRES, YOLO_OBS_TYPE
+from app.voyager_metadata import YOLO_NAME_TO_KOREAN, YOLO_THRES, YOLO_OBS_TYPE, HEIGHT_METRIC
 from app.wrapper_essential import DetectorObject
+from app.state_machine import Position
 
-# ALPHA_TO_RANGE = 20.0 / 255.0
+
 GLOBAL_INTERVAL = 2  # sec
-# DEV_YOLO_BASED_WARNING = False
 
 
 class ReadPriority(IntEnum):
     LEFT_TO_RIGHT = 0
     RIGHT_TO_LEFT = 1
-    NEAR_TO_FAR = 2
+    # NEAR_TO_FAR = 2
 
 
 class ReadObstacle(IntEnum):
@@ -25,7 +25,6 @@ class ReadObstacle(IntEnum):
     STATIC = 0b00010
     FLOOR = 0b00100
     BUS_STOP = 0b01000
-    CROSSWALK = 0b10000
 
 
 class Direction(IntEnum):
@@ -34,20 +33,7 @@ class Direction(IntEnum):
     CENTER = 2
     RIGHT = 4
 
-
-obstacle_on_crosswalk = ["car", "bus", "truck", "motorcycle", "bicycle", "kickbaord", "bollard"]
-height_metric = {
-    "car": 100,
-    "bus": 200,
-    "truck": 150,
-    "motorcycle": 100,
-    "bicycle": 100,
-    "kickboard": 150,
-    "bollard": 100,
-}  # 라이다 없는 경우 가깝다고 판단하는 기준 픽셀높이
-
-# Scene 문제점 : 너무 많은 객체 읽게 되는 경우
-# Depth  픽셀값0~255 : 거리0~20 : 실제사용0~7
+OBSTACLE_ON_CROSSROAD = ["car", "bus", "truck", "motorcycle"]
 
 
 class ClockCycleStateActivator:
@@ -64,11 +50,15 @@ class ClockCycleStateActivator:
         self.img_size = img_size
         self.sorted_obj = None
         self.last_global: float = basetime
-        self.time = basetime
         
+        self.counter = 0
+        self.toggle = True
+        
+        self.prev_position: Position = None
         self.prev_cross: int = 0
         self.curr_cross: int = 0
         self.curr_braille: int = 0
+        
         self.lost_braille_cnt: int = 0
         self.warning_level: int = 0
         
@@ -96,63 +86,84 @@ class ClockCycleStateActivator:
         yolo: List[DetectorObject],
         is_now_crossing: bool,
         is_guiding_crossroad: bool,
-        depth_map:np.ndarray =None,
+        is_depth: bool,
+        position: Position = None,
+        depth_map: np.ndarray = None,
     ):
-        self.update(nowtime, yolo, depth_map)
+        # 0.상태업데이트
+        self.update(nowtime, yolo, is_depth, position)
         
-        # 위험도 계산
-        warning_levels :List[int] = [0,0,0]
-        for el in self.sorted_obj:
-            idx = int(self.direct(el['xc']) / 2)
-            warning_levels[idx] += pow(2.5, (6.0 - el['depth']))
-            if warning_levels[idx] > 100:
-                warning_levels[idx] = 100
-
-        # 최근 안내가 너무 많을 때
-        if not self.available(nowtime):
-            logger.info("Inform type: Unavailable")
-            return "", warning_levels
+        
+        # 2.전방묘사버튼 문구
+        descrip_msg = 
+        
+        
+        # 3.점자블록버튼 문구
+        braille_msg = f"점자블록이 {dir2str(self.curr_braille, self.priority)}에 있습니다"
+        
+        
+        # 1.강제안내문구
+        
+         # 최근 안내가 너무 많을 때
+        # if not self.available(nowtime):
+        #     logger.info("Inform type: Unavailable")
+        #     return "", warning_levels
 
         msg = ""
-        # 추돌주의 + 볼라드 (작동안함)
-        # if ((self.prev_warning != self.curr_warning) and ((self.time - self.last_warning > self.warning_period) or (self.prev_warning == 0))) or /
-        # (self.curr_bollard and self.prev_bollard != self.curr_bollard):
-        #     msg = "볼라드 정면" if self.curr_bollard else ""
-        #     msg += self.msg_warning()
-        #     logger.info("Inform type: WARNING")
-
         # 횡단보도 건너는 중
         if is_now_crossing:
-            logger.info("Inform type: NOW_CROSSING")
-            msg = self.inform_on_cross()
-            self.timer_reset(time.time())
+            if self.toggle:
+                self.toggle = False
+                self.counter = 0
+            else:
+                self.counter += 1
+                
+            if counter == 3:
+                logger.info("Inform type: NOW_CROSSING")
+                msg = self.inform_on_cross(yolo)
+                # self.timer_reset(time.time())
 
         # 신호기다리는 중
         elif is_guiding_crossroad:
             logger.info("Inform type: WAITING LIGHT")
             msg = self.inform_waiting_light()
 
-        # 점자블록 혹은 전방묘사
-        # else:
-            # if self.time - self.last_braille > self.braille_period:
-            #     logger.info("Inform type: BRAILLE")
-            #     msg = self.msg_braille()
+        # State기반 점자블록 안내
+        else:
+            self.toggle = True
+            self.counter = 0
+            if self.lost_braille_cnt > 5 and self.curr_braille != 0:
+                msg = braille_msg
 
-            # elif self.time - self.last_scene > self.scene_period:
-            #     logger.info("Inform type: SCENE")
-            #     msg = self.msg_scene()
-            # else:
-            #     logger.info("Inform type: IDLE")
-            #     return "", warning_levels
+        if msg != "":
+            self.last_global = time
 
-        self.last_global = time.time()
-        return msg, warning_levels
+        
+ 
+        # 4.위험도
+        warning_levels: List[int] = [0, 0, 0]
+        if is_depth:
+            for el in self.sorted_obj:
+                idx = int(self.direct(el['xc']) / 2)
+                warning_levels[idx] += max(int(119 - 19*el['depth']), 0)
+                if warning_levels[idx] > 100:
+                    warning_levels[idx] = 100
+        else:
+            for el in self.sorted_obj:
+                idx = int(self.direct(el['xc']) / 2)
+                standard = HEIGHT_METRIC[el.name]
+                warning_levels[idx] += int((el['h'] - standard) / standard * 0.66)
+                if warning_levels[idx] > 100:
+                    warning_levels[idx] = 100
+            
+       
+
+        return msg, descrip_msg, braille_msg, warning_levels
 
     def available(self, time: float):
         return time - self.last_global > GLOBAL_INTERVAL
 
     def timer_reset(self, time: float):
-        self.time = time
         self.last_scene = time
         self.last_braille = time
 
@@ -168,32 +179,37 @@ class ClockCycleStateActivator:
         self,
         time: float,
         yolo: List[DetectorObject],
-        depth_map = None
+        is_depth: bool,
+        position: Position
     ):
-        # self.yolo = yolo
-        self.time = time
-
-        # Update Zebra_Cross
-        self.prev_cross = self.curr_cross
-        sorted_yolo = sorted(yolo, key=lambda x: x["ymax"], reverse=True)
-        cross = None
-        for el in sorted_yolo:
-            if el["name"] == "Zebra_Cross":
-                cross = el
-                break
-        self.curr_cross = (
-            Direction.NONE if cross is None else self.direct(cross["xc"])
-        )
+        # Update Zebra_Cross (가만히 있었으면 업데이트 안함)
+        if self.prev_position and not position.similar_to(self.prev_position):
+            self.prev_cross = self.curr_cross
+            dist_sort = sorted(yolo, key=lambda x: x["ymax"], reverse=True)
+            cross = None
+            for el in dist_sort:
+                if el["name"] == "Zebra_Cross":
+                    cross = el
+                    break
+            self.curr_cross = (
+                Direction.NONE if cross is None else self.direct(cross["xc"])
+            )
+        self.prev_position = position
 
         # Update Warning Level
         guide_list = []
-        for el in yolo:
-            if el.name not in self.target_obs:
-                continue
-            if el.confidence < YOLO_THRES[el.name]:
-                continue
-            if el["depth"] < self.scene_range:  # 라이다가 없으면 물체를 전부 다 읽음
-                guide_list.append(el)
+        if is_depth:
+            for el in yolo:
+                if el.name not in self.target_obs or el.confidence < YOLO_THRES[el.name]:
+                    continue
+                if el["depth"] < self.scene_range:
+                    guide_list.append(el)
+        else:
+            for el in yolo:
+                if el.name not in self.target_obs or el.confidence < YOLO_THRES[el.name]:
+                    continue
+                if el['h'] >= HEIGHT_METRIC[el.name]:
+                    guide_list.append(el)
 
         if self.priority == ReadPriority.LEFT_TO_RIGHT:
             sorted_obj = sorted(
@@ -201,10 +217,10 @@ class ClockCycleStateActivator:
             )
         elif self.priority == ReadPriority.RIGHT_TO_LEFT:
             sorted_obj = sorted(guide_list, key=lambda x: x["xc"], reverse=True)
-        elif self.priority == ReadPriority.NEAR_TO_FAR:
-            sorted_obj = sorted(
-                guide_list, key=lambda x: x["depth"], reverse=False
-            )
+        # elif self.priority == ReadPriority.NEAR_TO_FAR:
+        #     sorted_obj = sorted(
+        #         guide_list, key=lambda x: x["depth"], reverse=False
+        #     )
 
         self.sorted_obj = sorted_obj
         
@@ -218,7 +234,7 @@ class ClockCycleStateActivator:
         for el in yolo:
             if (
                 el["name"] == "Braille_Block"
-                and el["ymax"] > self.img_size[0] * 0.5
+                and el["ymax"] > self.img_size[0] * 0.7
             ):  # 중간 높이 아래에 있는 점자블록만 안내
                 direction_set.add(self.direct(el["xc"]))
                 
@@ -236,8 +252,6 @@ class ClockCycleStateActivator:
     ):
         self.yolo = yolo
         self.depth_cnt = self.depth_counting(depth_map)
-
-        self.time = time
 
         # self.prev_braille = self.curr_braille
         self.prev_cross = self.curr_cross
@@ -289,9 +303,6 @@ class ClockCycleStateActivator:
         if depth_map is None:
             return None
 
-        # np.savetxt("output.txt", self.depth_map, fmt="%1.3f")
-        # logger.info(f"warning_range: {self.warning_range}")
-
         h = self.img_size[0]
         w = self.img_size[1]
 
@@ -319,8 +330,22 @@ class ClockCycleStateActivator:
                 alert_direction += pow(2, zone)
         return alert_direction
 
-    def inform_on_cross(self) -> str:
+    def inform_on_cross(self) -> str:   # 처음 건널때 한번만 안내하도록 변경
         guide_list = []
+        cross = None
+        for el in yolo:
+            if el.name == 'Zebra_Cross':
+                cross = el
+            elif el.name in OBSTACLE_ON_CROSSROAD:
+                guide_list.append(el)
+        guide_list = sorted(guide_list, key=lambda x: x['ymax'])
+        
+        critical_set = []
+        for el in guide_list:
+            if el.ymax > cross.ymin and self.direct(el.xc) not in critical_set:
+                if 
+        
+        
         if self.depth_cnt is None:
             for el in self.yolo:
                 if (
@@ -349,27 +374,27 @@ class ClockCycleStateActivator:
         else:
             return ""
 
-    def inform_waiting_light(self) -> str:
+    def inform_waiting_light(self) -> str:  #위치가 변하지 않으면 안내 재생성하지 않도록 변경
         if self.prev_cross != self.curr_cross:
             return " 횡단보도" + dir2str(self.curr_cross)
         else:
             return ""
 
-    def msg_braille(self):
-        # self.last_braille = self.time
-        return "점자블록" + dir2str(self.curr_braille, self.priority)
+    # def msg_braille(self):
+    #     self.last_braille = self.time
+    #     return "점자블록" + dir2str(self.curr_braille, self.priority)
 
-    def msg_scene(self):
-        # self.last_scene = self.time
-        return obj2str(self.sorted_obj)
+    # def msg_scene(self):
+    #     self.last_scene = self.time
+    #     return obj2str(self.sorted_obj)
     
     
-    def msg_warning(self):
-        self.last_warning = self.time
-        if self.curr_warning == 0:
-            return ""
-        msg = dir2str(self.curr_warning, self.priority)
-        return "추돌주의" + msg
+    # def msg_warning(self):
+    #     self.last_warning = self.time
+    #     if self.curr_warning == 0:
+    #         return ""
+    #     msg = dir2str(self.curr_warning, self.priority)
+    #     return "추돌주의" + msg
 
 
 def obj2str(yolo: List[DetectorObject], warning: bool = False):
@@ -414,24 +439,3 @@ def update_target_obs(target_obs_num):
         for el in YOLO_OBS_TYPE["BUS_STOP"]:
             target_obs.append(el)
     return target_obs
-
-
-# def temp():
-# Warning mesg generating based on YOLO
-# if DEV_YOLO_BASED_WARNING:
-#     warning_obj = []
-#     for el in sorted_obj:
-#         if el["depth"] < 2:
-#             warning_obj.append(el)
-#     warning_msg = obj2str(warning_obj, True)
-
-# # Warning mesg by depth map
-# else:
-#     dist_map = (255 - depth_map) * ALPHA_TO_RANGE
-#     np.savetxt("output.txt", dist_map, fmt="%1.3f")
-#     warning_msg = ""
-
-# logger.info(
-#     f"User trigger description: {user_trigger_msg}, Warning message: {warning_msg}"
-# )
-# return user_trigger_msg, warning_msg

@@ -61,21 +61,20 @@ def getOpt(pt_file=""):
 
 opt = getOpt()
 
+# save_dir = Path(
+#     increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok)
+# )  # increment run
 save_dir = Path(
-    increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok)
-)  # increment run
+    increment_path(Path(opt.project) / (f"{datetime.now().strftime('%y%m%d_')}" + opt.name), exist_ok=False)
+)
 app = FastAPI()
 stateMachine = StateMachine()
 tracker = TrackerWrapper()
 
 settings = {
-    "scene_type": 2,
-    "mode": 0,
+    "scene_type": 2, # 0 ~ 15사이 정수
+    "mode": 0,  # 0 또는 1
     "scene_range": 6.0,
-    # "warning_range": 1.1,
-    # "braille_period": 15,
-    # "scene_period": 30,
-    # "warning_period": 5,
 }
 clockcyclestateactivator = ClockCycleStateActivator(settings, time.time())
 
@@ -201,37 +200,35 @@ async def file_upload(
     # logger.info(f"트래킹, 스테이트머신 처리: time: {time.time() - tick}")
 
     # 안내 생성
-    descrip_str, direction_warning_level = clockcyclestateactivator.inform(
+    CS = clockcyclestateactivator
+    warning_str, descrip_str, braille_str, direction_warning_level = CS.inform(
         time.time(),
         desc_dict[session_no].yolo,
         stateMachine.is_now_crossing,
         stateMachine.crossroad_state,
-        depth_map,
+        depth_map is not None,
+        position,
     )
-    logger.info(
-        f"횡단보도 안내: {guide_enum}, 일반 안내: {descrip_str}, time: {time.time() - tick}"
-    )
+    logger.info(f"횡단보도 안내: {guide_enum}, 위험안내: {warning_str}, 위험수준: {direction_warning_level}")
+    logger.info(f"전방묘사 버튼: {descrip_str}, 점자블록 버튼: {braille_str}")
 
     # 로깅
     logger.info("/upload total runtime: {}", (time.time() - tick))
-    # logger.info("횡단보도 안내: {}", guide_enum)
-    # logger.info("일반 안내: {}", descrip_str)
     log_dict = {
         "is_depth": depth_map is not None,
         "rgb_shape": rgb.shape,
+        "guide": guide_enum,
+        "position": position.__dict__ if position else {},
         "yolo1": [box.__dict__ for box in result_dict[session_no].yolo],
         "yolo2": [box.__dict__ for box in desc_dict[session_no].yolo],
-        "position": position.__dict__ if position else {},
-        "guide": guide_enum,
-        "description": descrip_str,
-        "direction_warning_level": direction_warning_level
     }
     print(json.dumps(log_dict), flush=True)
 
     return {
         "guide": guide_enum,
-        "yolo": "",  # 이제 이거 바꿔야됨
-        "warning": descrip_str,
+        "warning": warning_str, # 여기에도 점자블록 안내 일부있음
+        "yolo": descrip_str, # (버튼1) 안내 설정한 대상에 한해서만 안내됨
+        "braille": braille_str, # (버튼2)
         "direction_warning_level": direction_warning_level   # [2, 34, 96],
     }
 
