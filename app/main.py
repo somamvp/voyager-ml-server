@@ -3,6 +3,7 @@ import time, os
 import app.description as description
 import easydict, cv2
 import numpy as np
+import pickle
 
 from typing import Dict, Optional
 from datetime import datetime
@@ -27,6 +28,8 @@ from app.voyager_metadata import (
     YOLO_NAME_TO_KOREAN,
     ALPHA_TO_RANGE,
 )
+from app.state_redis import rd
+from app.state_saver import StateSaver
 
 
 def getOpt(pt_file=""):
@@ -65,14 +68,18 @@ opt = getOpt()
 #     increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok)
 # )  # increment run
 save_dir = Path(
-    increment_path(Path(opt.project) / (f"{datetime.now().strftime('%y%m%d_')}" + opt.name), exist_ok=False)
+    increment_path(
+        Path(opt.project)
+        / (f"{datetime.now().strftime('%y%m%d_')}" + opt.name),
+        exist_ok=False,
+    )
 )
 app = FastAPI()
 stateMachine = StateMachine()
 tracker = TrackerWrapper()
 
 settings = {
-    "scene_type": 2, # 0 ~ 15사이 정수
+    "scene_type": 2,  # 0 ~ 15사이 정수
     "mode": 0,  # 0 또는 1
     "scene_range": 6.0,
 }
@@ -138,6 +145,19 @@ async def root(
     return {"message": "Hello World"}
 
 
+@app.get("/create")
+async def create():
+    # create csl
+
+    state_machine = StateMachine(should_light_exist=None)
+    tracker = TrackerWrapper()
+    cs = ClockCycleStateActivator({}, time.time())
+
+    redis_objects = StateSaver(state_machine, tracker, cs)
+
+    return {"redis": redis_objects.stringify()}
+
+
 @app.get("/test")
 async def test():
     return {"message": "test"}
@@ -146,14 +166,43 @@ async def test():
 @app.post("/upload")
 async def file_upload(
     source: bytes = File(...),
-    session_no: int = Form(default=1, alias="sequenceNo"),
+    sequence_no: int = Form(1),
+    session_id: Optional[str] = Form(None),
     is_rot: bool = Form(True),
-    gps_info: str = Form("{}", alias="gpsInfo"),
+    gps_info: str = Form("{}"),
+    cross_start: bool = Form(False),
+    should_light_exist: Optional[bool] = Form(None),
 ):
+
+    logger.info(f"session_id {session_id}; cross_start {cross_start}")
+
+    if session_id is None:
+        global stateMachine, tracker, clockcyclestateactivator
+
+    if cross_start:
+        logger.info(
+            f"--------restarting state machine & tracker: light {should_light_exist}----------"
+        )
+        stateMachine = StateMachine(should_light_exist=should_light_exist)
+        tracker = TrackerWrapper()
+    elif session_id is not None:
+        # 세션 아이디를 기반으로 레디스에 저장한 이전 값을 불러옴
+        key = f"state:{session_id}"
+
+        # redis에 저장된 값 파싱해서 쓰면 됌.
+        # ex)"{'redis':{"state_machine": "b\\"\\\\x80\\\\x04\\\\x95X\\\\x01\\\\x00\\\\x00\\...}"
+        data = rd.hget(key, "stateResult")
+        string = json.loads(data)["redis"]
+
+        state_saver = StateSaver.unstringify(string)
+
+        stateMachine = state_saver.state_machine
+        tracker = state_saver.tracker
+        clockcyclestateactivator = state_saver.clock_activator
+
     # High-frequency Acting
     tick = time.time()
-    global clockcyclestateactivator
-    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_Session{session_no}"
+    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_{session_id[:5]}_{sequence_no}"
 
     # 이미지 로딩
     rgb, depth_map = bytes2cv(source, is_rot)
@@ -164,30 +213,31 @@ async def file_upload(
         depth_map = (255 - depth_map) * ALPHA_TO_RANGE
 
     logger.info(
-        f"SESSION: {session_no} - image recieved! size: {rgb.shape}, image conversion time: {time.time() - tick}"
+        f"SESSION: {sequence_no} - image recieved! size: {rgb.shape}, image conversion time: {time.time() - tick}"
     )
 
     # YOLO 추론
-    result_dict[session_no] = Basicv7detector.inference(
-        source=rgb, im_id=session_no, save_name=log_str, depth_map=depth_map
+    result_dict[session_id] = Basicv7detector.inference(
+        source=rgb, im_id=sequence_no, save_name=log_str, depth_map=depth_map
     )
     logger.info(
-        f"발견된 물체(횡단보도 안내): {[box.name for box in result_dict[session_no].yolo]}, time: {time.time() - tick}"
+        f"발견된 물체(횡단보도 안내): {[box.name for box in result_dict[session_id].yolo]}, time: {time.time() - tick}"
     )
 
-    desc_dict[session_no] = Descv7detector.inference(
+    desc_dict[session_id] = Descv7detector.inference(
         source=rgb,
-        im_id=session_no,
+        im_id=session_id,
         save_name=log_str + "_d",
         depth_map=depth_map,
     )
     logger.info(
-        f"발견된 물체(전체): {[box.name for box in desc_dict[session_no].yolo]}, time: {time.time() - tick}"
+        f"발견된 물체(전체): {[box.name for box in desc_dict[session_id].yolo]}, time: {time.time() - tick}"
     )
 
     # Tracking & State Machine
     tracked_objects = tracker.update(
-        result_dict[session_no].yolo, validate_zebra_cross=(img_size[0] // 2)
+        result_dict[session_id].yolo,
+        validate_zebra_cross=(img_size[0] // 2),
     )
     tracker.save_result(rgb, save_path=f"{save_dir / log_str}_tracking.jpg")
 
@@ -203,13 +253,15 @@ async def file_upload(
     CS = clockcyclestateactivator
     warning_str, descrip_str, braille_str, direction_warning_level = CS.inform(
         time.time(),
-        desc_dict[session_no].yolo,
+        desc_dict[session_id].yolo,
         stateMachine.is_now_crossing,
         stateMachine.crossroad_state,
         depth_map is not None,
         position,
     )
-    logger.info(f"횡단보도 안내: {guide_enum}, 위험안내: {warning_str}, 위험수준: {direction_warning_level}")
+    logger.info(
+        f"횡단보도 안내: {guide_enum}, 위험안내: {warning_str}, 위험수준: {direction_warning_level}"
+    )
     logger.info(f"전방묘사 버튼: {descrip_str}, 점자블록 버튼: {braille_str}")
 
     # 로깅
@@ -222,15 +274,20 @@ async def file_upload(
         "yolo1": [box.__dict__ for box in result_dict[session_no].yolo],
         "yolo2": [box.__dict__ for box in desc_dict[session_no].yolo],
     }
-    print(json.dumps(log_dict), flush=True)
 
-    return {
+    redis_objects = StateSaver(stateMachine, tracker, clockcyclestateactivator)
+    result = [*range(3)]
+    result[0] = {
         "guide": guide_enum,
-        "warning": warning_str, # 여기에도 점자블록 안내 일부있음
-        "yolo": descrip_str, # (버튼1) 안내 설정한 대상에 한해서만 안내됨
-        "braille": braille_str, # (버튼2)
-        "direction_warning_level": direction_warning_level   # [2, 34, 96],
+        "warning": warning_str,  # 여기에도 점자블록 안내 일부있음
+        "yolo": descrip_str,  # (버튼1) 안내 설정한 대상에 한해서만 안내됨
+        "braille": braille_str,  # (버튼2)
+        "direction_warning_level": direction_warning_level,  # [2, 34, 96],
     }
+    result[1] = {"logdict": log_dict}
+    result[2] = {"redis": redis_objects.stringify()}
+
+    return result
 
 
 @app.get("/start")
