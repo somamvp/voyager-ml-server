@@ -47,8 +47,8 @@ class ClockCycleStateActivator:
         self.priority: int = settings.get("mode", 0)
         self.scene_range: float = settings.get("scene_range", 6.0)
         # self.warning_range: float = settings.get("warning_range", 1.1)
-        self.img_size = img_size
-        self.sorted_obj = None
+        self.img_size: List[int,int] = img_size
+        self.sorted_obj: List[DetectorObject] = None #안내대상만 읽는 순서대로 정렬한 것임
         self.last_global: float = basetime
         
         self.counter = 0
@@ -95,7 +95,7 @@ class ClockCycleStateActivator:
         
         
         # 2.전방묘사버튼 문구
-        descrip_msg = 
+        descrip_msg = self.msg_scene()
         
         
         # 3.점자블록버튼 문구
@@ -118,27 +118,30 @@ class ClockCycleStateActivator:
             else:
                 self.counter += 1
                 
-            if counter == 3:
+            if counter == 3: #횡단보도 당 한번만 안내가 진행된다
                 logger.info("Inform type: NOW_CROSSING")
                 msg = self.inform_on_cross(yolo)
                 # self.timer_reset(time.time())
 
-        # 신호기다리는 중
-        elif is_guiding_crossroad:
-            logger.info("Inform type: WAITING LIGHT")
-            msg = self.inform_waiting_light()
-
-        # State기반 점자블록 안내
+        
         else:
             self.toggle = True
             self.counter = 0
+            
+            # 신호기다리는 중
+            if is_guiding_crossroad:
+                logger.info("Inform type: WAITING LIGHT")
+                msg = self.inform_waiting_light()
+
+            # State기반 점자블록 안내
             if self.lost_braille_cnt > 5 and self.curr_braille != 0:
+                logger.info("Inform type: BRAILLE FOUND")
                 msg = braille_msg
+
 
         if msg != "":
             self.last_global = time
 
-        
  
         # 4.위험도
         warning_levels: List[int] = [0, 0, 0]
@@ -330,51 +333,44 @@ class ClockCycleStateActivator:
                 alert_direction += pow(2, zone)
         return alert_direction
 
-    def inform_on_cross(self) -> str:   # 처음 건널때 한번만 안내하도록 변경
+    def inform_on_cross(self, yolo) -> str:   # 처음 건널때 한번만 안내함
         guide_list = []
         cross = None
+        
+        #횡단보도 객체파악 및 안내대상 객체 가까운 순으로 정렬
         for el in yolo:
             if el.name == 'Zebra_Cross':
                 cross = el
             elif el.name in OBSTACLE_ON_CROSSROAD:
                 guide_list.append(el)
         guide_list = sorted(guide_list, key=lambda x: x['ymax'])
+        if not cross or not guide_list:
+            return ""
         
-        critical_set = []
+        #횡단보도와 겹쳐있는 물체 판별, 횡단보도 중심으로부터 너무 치우쳐진 곳에 있으면 부정확함
+        critical_directions = [0,0] # 위험한 물체의 왼쪽 갯수, 오른쪽 갯수
         for el in guide_list:
-            if el.ymax > cross.ymin and self.direct(el.xc) not in critical_set:
-                if 
+            if el.ymax > cross.ymin:
+                if el.xmax > (cross.xmin + cross.xc) / 2 or el.xmin < (cross.xmax + cross.xc) / 2:
+                # 일단 지금은 아주 간단한 형태로 구현해놓음. 추후 사다리꼴 판별로 변경예정
+                    if el.xc < cross.xc:
+                        critical_directions[0] += 1
+                    else:
+                        critical_directions[1] += 1
         
-        
-        if self.depth_cnt is None:
-            for el in self.yolo:
-                if (
-                    el.name in obstacle_on_crosswalk
-                    and el.h > height_metric[el.name]
-                ):
-                    guide_list.append(el)
-            sorted_obj = sorted(
-                guide_list, key=lambda x: x["ymax"], reverse=True
-            )
-
-        else:
-            for el in self.yolo:
-                if (
-                    el.name in obstacle_on_crosswalk
-                    and el["depth"] < self.scene_range
-                ):
-                    guide_list.append(el)
-            sorted_obj = sorted(guide_list, key=lambda x: x["depth"])
-
-        if sorted_obj:
-            nearest = sorted_obj[0]
-            return f" {YOLO_NAME_TO_KOREAN[nearest.name]}" + dir2str(
-                self.direct(nearest.xc)
-            )
+        msg = ""
+        if critical_directions[0] > 0 and critical_directions[1] > 0:
+            msg = "양쪽"
+        elif critical_directions[0] > 0:
+            msg = "왼쪽"
+        elif critical_directions[1] > 0:
+            msg = "오른쪽"
         else:
             return ""
+        
+        return "횡단보도 " + msg + "에 차가 있으니 주의하세요"
 
-    def inform_waiting_light(self) -> str:  #위치가 변하지 않으면 안내 재생성하지 않도록 변경
+    def inform_waiting_light(self) -> str:  # 위치가 변하지 않으면 안내 재생성하지 않도록 변경
         if self.prev_cross != self.curr_cross:
             return " 횡단보도" + dir2str(self.curr_cross)
         else:
@@ -384,9 +380,15 @@ class ClockCycleStateActivator:
     #     self.last_braille = self.time
     #     return "점자블록" + dir2str(self.curr_braille, self.priority)
 
-    # def msg_scene(self):
-    #     self.last_scene = self.time
-    #     return obj2str(self.sorted_obj)
+    def msg_scene(self):
+        # self.last_scene = self.time
+        now_direction = 0
+        msg = ""
+        for el in self.sorted_obj:
+            if direct(el.xc) != now_direction:
+                msg += dir2str(direct(el.xc))+" "
+            msg += YOLO_NAME_TO_KOREAN[el.name]
+        return msg
     
     
     # def msg_warning(self):
@@ -397,12 +399,11 @@ class ClockCycleStateActivator:
     #     return "추돌주의" + msg
 
 
-def obj2str(yolo: List[DetectorObject], warning: bool = False):
+def obj2str(yolo: List[DetectorObject]):
     msg = ""
     for el in yolo:
         korean_name = YOLO_NAME_TO_KOREAN[el["name"]]
-        append = korean_name + " 충돌주의 " if warning else "" + korean_name + " "
-        msg = msg + append
+        msg += korean_name + " "
     return msg
 
 
