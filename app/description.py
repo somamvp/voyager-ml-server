@@ -112,20 +112,18 @@ class ClockCycleStateActivator:
         msg = ""
         # 횡단보도 건너는 중
         if is_now_crossing:
-            if self.toggle:
-                self.toggle = False
-                self.counter = 0
-            else:
-                self.counter += 1
+            self.counter += 1
                 
-            if counter == 3: #횡단보도 당 한번만 안내가 진행된다
-                logger.info("Inform type: NOW_CROSSING")
+            logger.info("Inform type: NOW_CROSSING")
+            if self.counter == 3: #횡단보도 당 한번만 안내가 진행된다
                 msg = self.inform_on_cross(yolo)
                 # self.timer_reset(time.time())
+            elif self.counter > 5:
+                msg = self.inform_waiting_light()
 
         
         else:
-            self.toggle = True
+            # self.toggle = True
             self.counter = 0
             
             # 신호기다리는 중
