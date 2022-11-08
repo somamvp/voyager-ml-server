@@ -1,3 +1,31 @@
+
+# Trash can
+DELETE/
+
+# Data files
+*.mp4
+*.MOV
+*.gif
+*.zip
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# Run files
+*.sh
+
+# Nohup log files
+*.out
+
+# local testing files
+tests/
+tracked/
+RGBD/*
+!RGBD/*.py
+!RGBD/merged.webp
+app/output.txt
+
 # YOLO files
 runs/
 *.pt
@@ -131,8 +159,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-*.png
-*.jpg
-*.jpeg
 *.pem
-*.webp
+
+.idea

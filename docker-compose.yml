@@ -1,0 +1,37 @@
+version: '3.3'
+services:
+  fastapi:
+    # build: .
+    image: juwon8891/voyager-ml:0.3-amd
+    # command: uvicorn app.main:app --host 0.0.0.0 --port 9898 --reload
+    command: ./run_fastapi_docker.sh
+    # command: sleep 9999999
+    ports:
+      - 9898:9898
+    volumes:
+      - ./app/runs:/code/app/runs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+  #   depends_on:
+  #     - cuda
+  # cuda:
+  #   image: nvidia/cuda:11.7.0-base-ubuntu20.04
+  #   command: /bin/bash
+  #   runtime: nvidia
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [ gpu ]
+  # networks:
+  #   default:
+  #     driver: bridge
+  #     driver_opts:
+  #       com.docker.network.driver.mtu: 1442

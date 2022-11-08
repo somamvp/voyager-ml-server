@@ -1,11 +1,10 @@
-[submodule "yolov5"]
-	path = yolov5
-	url = https://github.com/ultralytics/yolov5.git
-[submodule "yolov7"]
-	path = yolov7
-	url = https://github.com/WongKinYiu/yolov7.git
-	branch = main
 [submodule "security"]
 	path = security
 	url = https://github.com/somamvp/security.git
 	branch = main
+[submodule "app/yolov7"]
+	path = app/yolov7
+	url = https://github.com/WongKinYiu/yolov7.git
+[submodule "app/yolov5"]
+	path = app/yolov5
+	url = https://github.com/ultralytics/yolov5.git

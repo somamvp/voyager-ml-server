@@ -1,0 +1,5 @@
+./app/__pycache__/
+./app/runs/
+./app/traced_model.pt
+./app/docker/runs/
+Dockerfile
