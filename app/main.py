@@ -202,8 +202,11 @@ async def file_upload(
 
     # High-frequency Acting
     tick = time.time()
-    log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_{session_id[:5]}_{sequence_no}"
-
+    if not session_id:
+        log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_{session_id[:5]}_{sequence_no}"
+    else:
+        log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_{sequence_no}"
+        
     # 이미지 로딩
     rgb, depth_map = bytes2cv(source, is_rot)
     img_size = [rgb.shape[0], rgb.shape[1]]
