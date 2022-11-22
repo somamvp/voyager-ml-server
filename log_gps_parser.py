@@ -22,7 +22,6 @@ def log_parser(filename: str):
     seq_NO = None
     size = 10
     objects = None
-
     for line in lines:
 
         current_session = session_id(line)
@@ -38,13 +37,12 @@ def log_parser(filename: str):
         current_find_object = find_object(line)
 
         if current_find_object:
-            objects = current_find_object
+            objects = ",".join(map(str, current_find_object))
 
         if session and point and seq_NO and objects:
             SESSION_DICT[session].append(point)
+            objects = ",".join(set(objects.split(",")))
             PARSED.append((date_time, session, seq_NO, size, *point, objects))
-            for obj in objects:
-                PARSED.append(obj)
 
     df = pd.DataFrame(
         PARSED,
