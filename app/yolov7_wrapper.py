@@ -213,7 +213,7 @@ class v7Detector:
                         img_save,
                         label=label,
                         color=self.colors[box.cls],
-                        line_thickness=3,
+                        line_thickness=2,
                     )
 
             results = DetectorInference(yolo=boxes)

@@ -55,8 +55,10 @@ class Position:
 
 class StateMachine:
 
-    is_now_crossing = False
-    crossroad_state = False
+    is_now_crossing = (
+        False  # 현재 횡단보도를 건너고 있는 상태 (무신호 및 NotSure에서는 True로 바뀌지 않음)
+    )
+    crossroad_state = False  # 횡단보도에서 신호등을 기다리고 있는 상태
     last_trafficlight = TrafficLight.NotFound
     current_trafficlight = TrafficLight.NotFound
 
@@ -270,9 +272,8 @@ class StateMachine:
 
     def start_guiding_crossroad(self, initial_mention=True):
         self.crossroad_state = True
-        if self.should_light_exist == False:
+        if self.should_light_exist is False:
             self.guide("무신호 횡단보도 감지됨.")
-            self.crossroad_state = True
             return
 
         self.last_trafficlight = self.current_trafficlight
@@ -290,12 +291,13 @@ class StateMachine:
         if self.current_trafficlight == TrafficLight.Red:
             self.guide("빨간불입니다.")
         elif self.current_trafficlight == TrafficLight.Green:
-            self.guide("초록불입니다.")
+            self.guide(f"초록불입니다.{' 다음 신호를 기다려주세요' if initial_mention else ''}")
         else:
             self.guide("시야를 움직여 신호등을 탐색하세요.")
 
     def on_end_crossroad(self):
         self.crossroad_state = False
+        self.is_now_crossing = False
         self.guide("횡단보도가 시야에서 사라졌습니다.")
 
     def on_trafficlight_changed(self):
@@ -309,7 +311,6 @@ class StateMachine:
         else:
             if self.current_trafficlight == TrafficLight.Red:
                 self.guide("신호가 빨간불로 바뀌었습니다.")
-                self.crossroad_state = False
             elif self.current_trafficlight == TrafficLight.Green:
                 self.guide("신호가 초록불로 바뀌었습니다.")
                 self.is_now_crossing = True

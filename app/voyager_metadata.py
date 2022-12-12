@@ -65,14 +65,14 @@ YOLO_IDX_TO_KOREAN = {
     idx: korean for idx, korean in enumerate(list(YOLO_NAME_TO_KOREAN.values()))
 }
 YOLO_THRES = {
-    "Zebra_Cross": 0.5,
+    "Zebra_Cross": 0.45,
     "R_Signal": 0.3,
     "G_Signal": 0.3,
-    "Braille_Block": 0.4,
+    "Braille_Block": 0.35,
     "person": 0.5,
     "dog": 0.4,
     "tree": 0.35,
-    "car": 0.5,
+    "car": 0.4,
     "bus": 0.4,
     "truck": 0.3,
     "motorcycle": 0.35,
@@ -117,6 +117,7 @@ YOLO_OBS_TYPE = {
         "chair",
         "fire_hydrant",
         "movable_signage",
+        "kickboard",
     ],
     "FLOOR": ["manhole"],
     "BUS_STOP": ["bus_stop"],

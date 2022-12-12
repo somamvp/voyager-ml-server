@@ -92,7 +92,7 @@ Basicv7detector, Descv7detector = v7Detector(
 logger.info(
     f"Using models: basic-{YOLOV7_BASIC_PT_FILE}, desc-{YOLOV7_DESC_PT_FILE}"
 )
-logger.info(f"Using basic settings: {settings}")
+
 
 # 세션NO : detection result, 서비스 배포 시 여러장의 이미지를 한꺼번에 추론시키는 경우를 대비해 구축해놓았음.
 # 추후 메모리 누수 막기 위해 초기화시키는 알고리즘 필요
@@ -145,13 +145,15 @@ async def root(
     return {"message": "Hello World"}
 
 
-@app.get("/create")
-async def create():
+@app.post("/create")
+async def create(settings: str = Form("{}")):
     # create csl
-
+    setting = None
+    setting = json.loads(settings)
+    logger.info(f"Using settings: {setting}")
     state_machine = StateMachine(should_light_exist=None)
     tracker = TrackerWrapper()
-    cs = ClockCycleStateActivator({}, time.time())
+    cs = ClockCycleStateActivator(setting, time.time())
 
     redis_objects = StateSaver(state_machine, tracker, cs)
 
@@ -172,9 +174,12 @@ async def file_upload(
     gps_info: str = Form("{}"),
     cross_start: bool = Form(False),
     should_light_exist: Optional[bool] = Form(None),
+    device_description: str = Form("{}"),
 ):
-
-    logger.info(f"session_id {session_id}; cross_start {cross_start}")
+    device_description = json.loads(device_description)
+    logger.info(
+        f"session_id {session_id}; cross_start {cross_start}, device description {device_description}"
+    )
 
     if session_id is None:
         global stateMachine, tracker, clockcyclestateactivator
@@ -202,11 +207,11 @@ async def file_upload(
 
     # High-frequency Acting
     tick = time.time()
-    if not session_id:
+    if session_id:
         log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_{session_id[:5]}_{sequence_no}"
     else:
         log_str = f"{ datetime.now().strftime('%y%m%d_%H:%M:%S.%f')[:-4] }_{sequence_no}"
-        
+
     # 이미지 로딩
     rgb, depth_map = bytes2cv(source, is_rot)
     img_size = [rgb.shape[0], rgb.shape[1]]
@@ -282,10 +287,10 @@ async def file_upload(
     result = [*range(3)]
     result[0] = {
         "guide": guide_enum,
-        "warning": warning_str, # 여기에도 점자블록 안내 일부있음
-        "yolo": descrip_str, # (버튼1) 안내 설정한 대상에 한해서만 안내됨
-        "braille": braille_str, # (버튼2)
-        "direction_warning_level": direction_warning_level   # [2, 34, 96],
+        "warning": warning_str,  # 여기에도 점자블록 안내 일부있음
+        "yolo": descrip_str,  # (버튼1) 안내 설정한 대상에 한해서만 안내됨
+        "braille": braille_str,  # (버튼2)
+        "direction_warning_level": direction_warning_level,  # [2, 34, 96],
     }
     result[1] = {"logdict": log_dict}
     result[2] = {"redis": redis_objects.stringify()}

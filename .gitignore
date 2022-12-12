@@ -7,6 +7,10 @@ DELETE/
 *.MOV
 *.gif
 *.zip
+*.gzip
+*.gz
+*.deb
+
 *.png
 *.jpg
 *.jpeg
