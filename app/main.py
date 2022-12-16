@@ -417,3 +417,6 @@ async def file_inform(
         "yolo": f"높이기준 {msg_y}, 거리기준 {msg_depth}",
         "warning": "",
     }
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=9898) 

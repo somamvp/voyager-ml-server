@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/l4t-pytorch:r32.7.1-pth1.10-py3
+FROM nvcr.io/nvidia/l4t-pytorch:r32.7.1-pth1.9-py3
 
 WORKDIR /code
 #PIP 패키지가 추가되면 여기서 카피해야 함.
@@ -18,4 +18,5 @@ COPY ./requirements.txt /code/requirements.txt
 RUN pip3 install --no-cache-dir --upgrade -r /code/requirements.txt
 # COPY ./run_fastapi_docker.sh /code/run_fastapi_docker.sh
 COPY /app /code/app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9898"]
+# CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9898"]
+CMD ["python3", "-m", "app.main"]
