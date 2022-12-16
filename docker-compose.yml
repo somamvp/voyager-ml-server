@@ -2,9 +2,9 @@ version: '3.3'
 services:
   fastapi:
     # build: .
-    image: juwon8891/voyager-ml:0.3-amd
-    # command: uvicorn app.main:app --host 0.0.0.0 --port 9898 --reload
-    command: ./run_fastapi_docker.sh
+    image: jetson:0.1
+    command: uvicorn app.main:app --host 0.0.0.0 --port 9898 --reload
+    # command: ./run_fastapi_docker.sh
     # command: sleep 9999999
     ports:
       - 9898:9898

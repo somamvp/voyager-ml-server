@@ -17,7 +17,7 @@ DELETE/
 *.webp
 
 # Run files
-*.sh
+# *.sh
 
 # Nohup log files
 *.out
